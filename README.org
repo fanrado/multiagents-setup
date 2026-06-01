@@ -5,9 +5,10 @@
 * Overview
 
 A reusable tmux-based workspace for multi-agent coding sessions. A single
-script call creates a fully laid-out terminal environment where multiple AI
-coding agents (e.g. Claude Code) can run side by side, each in its own pane,
-all sharing the same working directory.
+script call creates a fully laid-out terminal environment where four agents
+work together — one human-controlled orchestrator and three autonomous Claude
+Code agents — to plan, implement, test, debug, and validate features on
+separate git branches.
 
 The workspace is designed to be project-agnostic: point it at any directory
 and it sets up the same consistent layout every time.
@@ -19,23 +20,49 @@ One tmux session, one window, four panes arranged in a 2×2 grid:
 #+BEGIN_EXAMPLE
 ┌─────────────────────┬─────────────────────┐
 │                     │                     │
-│    orchestrator     │      agent-1        │
-│                     │                     │
+│    orchestrator     │     developer       │
+│     (you)           │   (Claude Code)     │
 ├─────────────────────┼─────────────────────┤
 │                     │                     │
-│      agent-2        │      monitor        │
-│                     │                     │
+│      tester         │     debugger        │
+│   (Claude Code)     │   (Claude Code)     │
 └─────────────────────┴─────────────────────┘
 #+END_EXAMPLE
 
-| Pane           | Position     | Intended use                                  |
-|----------------+--------------+-----------------------------------------------|
-| orchestrator   | top-left     | Top-level agent that plans and delegates work |
-| agent-1        | top-right    | First worker agent                            |
-| agent-2        | bottom-left  | Second worker agent                           |
-| monitor        | bottom-right | Logs, test output, or a watch process         |
+| Pane          | Branch            | Role                                               |
+|---------------+-------------------+----------------------------------------------------|
+| orchestrator  | =features/<name>= | You. Write plans as beads issues, dispatch phases  |
+| developer     | =features/<name>= | Implements one plan phase at a time, no tests      |
+| tester        | =test/<name>=     | Writes and runs unit tests for each new feature    |
+| debugger      | =test/<name>=     | Fixes failing tests, iterates with tester          |
 
-Pane names and the session name are configurable in =config/workspace.conf=.
+* Workflow
+
+#+BEGIN_EXAMPLE
+You (orchestrator, tab 1)
+  │  1. Write plan-phase beads issues (each scoped to ≤ 2 files)
+  │  2. Run: ./scripts/dispatch.sh <issue-id>
+  ▼
+Developer (tab 2)  [features/<name> branch]
+  │  Reads the issue, implements the feature, commits
+  │  If scope > 2 files → notifies you and waits for refinement
+  │  On success → closes issue, runs sync to test branch
+  ▼
+Tester (tab 3)  [test/<name> branch]
+  │  Detects new commits from sync
+  │  Writes unit tests, runs them
+  │  Creates a test-report beads issue (PASS or FAIL)
+  ▼
+Debugger (tab 4)  [test/<name> branch]
+  │  If FAIL → fixes code, signals tester to rerun, iterates
+  │  When all tests pass → syncs back to feature branch
+  │  Creates a validation beads issue, notifies you
+  ▼
+You (orchestrator, tab 1)
+     Review, close the validation issue to confirm, or reject
+#+END_EXAMPLE
+
+See =beads-workflow.org= for the full coordination protocol.
 
 * Usage
 
@@ -46,6 +73,7 @@ Pane names and the session name are configurable in =config/workspace.conf=.
 #+END_SRC
 
 Opens a session named =multiagents= rooted in the current directory.
+The developer, tester, and debugger agents start automatically in their panes.
 
 ** Custom session name and directory
 
@@ -63,15 +91,12 @@ SESSION_NAME=myproject WORKSPACE_DIR=/path/to/repo ./workspace.sh
 
 #+BEGIN_SRC sh
 ./workspace.sh --attach
-# or
 ./workspace.sh -s myproject --attach
 #+END_SRC
 
 ** Full option reference
 
 #+BEGIN_EXAMPLE
-Usage: workspace.sh [OPTIONS]
-
 Options:
   -s, --session NAME    Session name (default: multiagents)
   -d, --dir DIR         Working directory (default: current directory)
@@ -79,9 +104,20 @@ Options:
   -h, --help            Show this help
 #+END_EXAMPLE
 
-* Keybindings
+** Dispatching a plan phase
 
-These bindings are active inside the workspace session:
+Once you have written a =plan-phase= beads issue, dispatch it to the developer:
+
+#+BEGIN_SRC sh
+./scripts/dispatch.sh <issue-id>
+# example:
+./scripts/dispatch.sh myproject-abc
+#+END_SRC
+
+The developer agent will see the issue, implement it on the =features/<name>=
+branch, and trigger the rest of the pipeline automatically.
+
+* Keybindings
 
 | Key     | Action                             |
 |---------+------------------------------------|
@@ -93,32 +129,21 @@ resizing, scrolling, etc.
 
 * Detaching and Reattaching
 
-Detaching leaves the session and all its panes running in the background.
-This is useful when handing off to another agent or stepping away without
-losing any running processes.
+Detaching leaves the session and all agents running in the background.
 
-** Detach (from inside the session)
+** Detach
 
 #+BEGIN_SRC sh
-# Keyboard shortcut
-C-b d
-
-# Or from the command line
-tmux detach
+C-b d          # keyboard shortcut inside the session
+tmux detach    # command line equivalent
 #+END_SRC
 
 ** Reattach
 
 #+BEGIN_SRC sh
-# Attach to the default workspace session
 tmux attach-session -t multiagents
-
-# Short form
-tmux a -t multiagents
-
-# Or let workspace.sh handle it
-./workspace.sh --attach
-./workspace.sh -s myproject --attach
+tmux a -t multiagents            # short form
+./workspace.sh --attach          # via the workspace script
 #+END_SRC
 
 ** List running sessions
@@ -127,73 +152,54 @@ tmux a -t multiagents
 tmux ls
 #+END_SRC
 
-Use this to find the session name if you have forgotten it or are running
-multiple workspaces at once.
-
 * File Structure
 
 #+BEGIN_EXAMPLE
 multiagents-setup/
-├── workspace.sh          # Entry point — creates the tmux session
+├── workspace.sh               # Entry point — creates the tmux session and launches agents
+├── beads-workflow.org         # Full beads coordination protocol
 ├── config/
-│   └── workspace.conf    # Session name, window name, pane titles
+│   └── workspace.conf         # Session name, window name, pane titles
+├── agents/
+│   ├── developer.md           # Developer agent instructions (CLAUDE.md)
+│   ├── tester.md              # Tester agent instructions (CLAUDE.md)
+│   └── debugger.md            # Debugger agent instructions (CLAUDE.md)
 └── scripts/
-    └── tmux_helpers.sh   # Shared tmux functions (split, title, send)
+    ├── tmux_helpers.sh         # Shared tmux functions (split, title, send)
+    ├── dispatch.sh             # Dispatch a plan-phase issue to the developer
+    ├── notify.sh               # Send an alert to the orchestrator pane
+    ├── sync.sh                 # Sync between features/<name> and test/<name>
+    └── agents/
+        ├── developer.sh        # Launch developer Claude Code agent
+        ├── tester.sh           # Launch tester Claude Code agent
+        └── debugger.sh         # Launch debugger Claude Code agent
 #+END_EXAMPLE
-
-** =workspace.sh=
-
-The main script. Parses CLI options, checks whether the session already
-exists, creates the tmux session, splits the window into the 2×2 grid using
-stable pane IDs, labels each pane, registers keybindings, and attaches.
-
-** =config/workspace.conf=
-
-Sourced by =workspace.sh= before any tmux commands run. Override any variable
-here or via environment variables to customise the workspace without touching
-the script.
-
-** =scripts/tmux_helpers.sh=
-
-Thin wrappers around tmux primitives. Each split function returns the new
-pane's ID (=%N= format) so subsequent splits always target the correct pane
-regardless of how tmux reindexes pane numbers internally.
 
 * Requirements
 
 - =tmux= ≥ 2.6 (for =select-pane -T= pane title support)
 - =bash= ≥ 4.0
-- =bd= (beads) — issue tracker used for all task management in this workspace
-
-** Installing beads
-
-#+BEGIN_SRC sh
-# Check the beads repository for the latest install instructions
-bd --version
-#+END_SRC
-
-Beads stores issues in a local Dolt database under =.beads/=. Run =bd prime=
-at the start of any session to load full workflow context and available
-commands.
+- =claude= CLI (Claude Code) — installed and authenticated
+- =bd= (beads) — issue tracker used for all agent coordination
 
 ** Beads quick reference
 
-| Command                      | Purpose                          |
-|------------------------------+----------------------------------|
-| =bd prime=                   | Load session context             |
-| =bd ready=                   | Show issues ready to work on     |
-| =bd create --title="..." =   | File a new issue                 |
-| =bd update <id> --claim=     | Claim an issue                   |
-| =bd close <id>=              | Mark an issue complete           |
-| =bd remember "insight"=      | Persist a note across sessions   |
+Run =bd prime= at the start of any session for full context.
+
+| Command                    | Purpose                        |
+|----------------------------+--------------------------------|
+| =bd prime=                 | Load session context           |
+| =bd ready=                 | Show issues ready to work on   |
+| =bd create --title="..."=  | File a new issue               |
+| =bd update <id> --claim=   | Claim an issue                 |
+| =bd close <id>=            | Mark an issue complete         |
+| =bd remember "insight"=    | Persist a note across sessions |
+| =bd memories <keyword>=    | Search persistent memory       |
 
 * Extending the Workspace
 
-To add a new pane, agent type, or startup command, the intended extension
-points are:
-
 1. Add a new =PANE_*= variable in =config/workspace.conf=.
-2. Add the corresponding split and title call in =workspace.sh= after the
-   existing four panes are created.
-3. Use =tmux_send= from =scripts/tmux_helpers.sh= to run a startup command
-   inside any pane automatically on launch.
+2. Add the corresponding split and title call in =workspace.sh=.
+3. Create =agents/<role>.md= with the agent's instructions.
+4. Create =scripts/agents/<role>.sh= to launch Claude Code with that file.
+5. Wire the launch command into =workspace.sh= for the new pane.
