@@ -27,6 +27,9 @@ Options:
   -a, --attach          Attach to existing session if it exists
   -h, --help            Show this help
 
+Keybindings (inside the session):
+  C-q               Kill the session and all its panes
+
 Environment variables:
   SESSION_NAME          Override default session name
   WORKSPACE_DIR         Override default working directory
@@ -74,6 +77,9 @@ tmux_pane_title "$TL" "$PANE_ORCHESTRATOR"
 tmux_pane_title "$TR" "$PANE_AGENT_1"
 tmux_pane_title "$BL" "$PANE_AGENT_2"
 tmux_pane_title "$BR" "$PANE_MONITOR"
+
+# C-q kills the session (no prefix needed)
+tmux bind-key -n C-q kill-session
 
 # Start focused on the orchestrator pane
 tmux select-pane -t "$TL"
