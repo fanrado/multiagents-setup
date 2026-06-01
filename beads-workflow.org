@@ -1,0 +1,114 @@
+#+TITLE: Beads Workflow — Multi-Agent Coordination
+#+OPTIONS: toc:2 num:nil
+
+* Overview
+
+This document defines how the four agents in the workspace use beads issues
+and memory to coordinate. Every agent reads from and writes to beads as its
+primary communication channel. Direct inter-pane signalling (tmux) is used
+only for immediate human-visible alerts.
+
+* Issue Types
+
+| Type           | Created by    | Purpose                                              |
+|----------------+---------------+------------------------------------------------------|
+| =plan-phase=   | Orchestrator  | One unit of work for the developer agent             |
+| =test-report=  | Tester        | Results of a test run (pass/fail + details)          |
+| =debug-session=| Debugger      | Record of a debug iteration and the fix applied      |
+| =validation=   | Debugger      | Signals the user that a feature is ready to review   |
+
+* Status Flow
+
+#+BEGIN_EXAMPLE
+open → in_progress → closed
+         │
+         └── blocked  (needs-refinement: plan too broad, waiting on user)
+#+END_EXAMPLE
+
+| Status              | Set by       | Meaning                                              |
+|---------------------+--------------+------------------------------------------------------|
+| =open=              | Creator      | Ready to be picked up                                |
+| =in_progress=       | Agent        | Work has started                                     |
+| =blocked=           | Developer    | Phase needs refinement before it can proceed         |
+| =closed=            | Agent / User | Work is complete                                     |
+
+* Issue Conventions
+
+** plan-phase
+
+Created by the user (or orchestrator agent) in tab 1. Each issue must:
+- Cover changes to at most 2 files.
+- Include enough context that the developer agent can implement without asking
+  questions (except to escalate scope violations).
+- Be dispatched explicitly via =scripts/dispatch.sh <issue-id>=.
+
+Suggested fields:
+#+BEGIN_EXAMPLE
+--title="<short imperative summary>"
+--description="What to build and why. Files involved: <file1>, <file2>."
+--type=task
+--priority=<0-4>
+#+END_EXAMPLE
+
+** test-report
+
+Created by the tester agent after each test run. Must include:
+- Reference to the =plan-phase= issue it covers.
+- Pass/fail status.
+- Names of failing tests and error output (if any).
+
+** debug-session
+
+Created by the debugger agent for each iteration. Must include:
+- Reference to the =test-report= that triggered it.
+- Root cause identified.
+- Fix applied (file + line summary).
+
+** validation
+
+Created by the debugger agent once all tests pass. Must include:
+- References to the original =plan-phase= and final =test-report=.
+- Summary of what was built and verified.
+- The user in tab 1 closes this issue after manual review.
+
+* Memory Conventions
+
+Agents use =bd remember= to persist knowledge across sessions. Use these
+prefixes so entries are searchable:
+
+| Prefix          | Example key                  | What to store                              |
+|-----------------+------------------------------+--------------------------------------------|
+| =perm:=         | =perm:read:/etc/hosts=       | Granted external file-read authorizations  |
+| =branch:=       | =branch:current=auth-refactor= | Active feature name for this workspace   |
+| =agent:=        | =agent:developer:last-phase= | Last issue ID processed by an agent        |
+| =pattern:=      | =pattern:test-runner=        | How to run tests in this project           |
+
+Search with: =bd memories <keyword>=
+
+* Dispatch Flow
+
+#+BEGIN_EXAMPLE
+User (tab 1)
+  │  writes plan-phase issues in beads
+  │  runs: ./scripts/dispatch.sh <issue-id>
+  ▼
+Developer (tab 2)
+  │  receives issue ID via tmux, marks in_progress
+  │  implements feature on features/<name> branch
+  │  if scope > 2 files: scripts/notify.sh → tab 1, marks blocked
+  │  on success: closes plan-phase, runs scripts/sync.sh to-test <name>
+  ▼
+Tester (tab 3)                         [on test/<name> branch]
+  │  detects new commits from sync
+  │  writes + runs unit tests
+  │  creates test-report issue (pass or fail)
+  ▼
+Debugger (tab 4)                       [on test/<name> branch]
+  │  if fail: reads test-report, fixes code, signals tester to rerun
+  │  iterates until all tests pass
+  │  runs scripts/sync.sh to-feature <name>
+  │  creates validation issue
+  ▼
+User (tab 1)
+     reviews validation issue, closes it to confirm or rejects
+#+END_EXAMPLE
