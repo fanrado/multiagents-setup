@@ -83,12 +83,52 @@ Options:
 
 These bindings are active inside the workspace session:
 
-| Key   | Action                              |
-|-------+-------------------------------------|
-| =C-q= | Kill the session and all its panes  |
+| Key     | Action                             |
+|---------+------------------------------------|
+| =C-q=   | Kill the session and all its panes |
+| =C-b d= | Detach from the session            |
 
 Standard tmux navigation (=C-b= prefix) works as usual for switching panes,
 resizing, scrolling, etc.
+
+* Detaching and Reattaching
+
+Detaching leaves the session and all its panes running in the background.
+This is useful when handing off to another agent or stepping away without
+losing any running processes.
+
+** Detach (from inside the session)
+
+#+BEGIN_SRC sh
+# Keyboard shortcut
+C-b d
+
+# Or from the command line
+tmux detach
+#+END_SRC
+
+** Reattach
+
+#+BEGIN_SRC sh
+# Attach to the default workspace session
+tmux attach-session -t multiagents
+
+# Short form
+tmux a -t multiagents
+
+# Or let workspace.sh handle it
+./workspace.sh --attach
+./workspace.sh -s myproject --attach
+#+END_SRC
+
+** List running sessions
+
+#+BEGIN_SRC sh
+tmux ls
+#+END_SRC
+
+Use this to find the session name if you have forgotten it or are running
+multiple workspaces at once.
 
 * File Structure
 
