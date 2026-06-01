@@ -1,0 +1,6 @@
+repos:
+  primary: "."
+  additional:
+    - "/Users/razakamiandra/WORKSPACE/multiagents-setup/"
+
+export.auto: true
