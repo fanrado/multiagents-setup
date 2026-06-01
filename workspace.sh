@@ -16,9 +16,9 @@ Opens a tmux workspace session with 4 panes in a 2×2 grid.
 
 Layout:
   ┌─────────────────┬─────────────────┐
-  │  orchestrator   │    agent-1      │
+  │  orchestrator   │   developer     │
   ├─────────────────┼─────────────────┤
-  │    agent-2      │    monitor      │
+  │    tester       │   debugger      │
   └─────────────────┴─────────────────┘
 
 Options:
@@ -74,12 +74,17 @@ BR=$(tmux_split_v "$TR" "$WORKSPACE_DIR")             # bottom-right
 
 # Label each pane
 tmux_pane_title "$TL" "$PANE_ORCHESTRATOR"
-tmux_pane_title "$TR" "$PANE_AGENT_1"
-tmux_pane_title "$BL" "$PANE_AGENT_2"
-tmux_pane_title "$BR" "$PANE_MONITOR"
+tmux_pane_title "$TR" "$PANE_DEVELOPER"
+tmux_pane_title "$BL" "$PANE_TESTER"
+tmux_pane_title "$BR" "$PANE_DEBUGGER"
 
 # C-q kills the session (no prefix needed)
 tmux bind-key -n C-q kill-session
+
+# Launch agents in their respective panes
+tmux send-keys -t "$TR" "$SCRIPT_DIR/scripts/agents/developer.sh" Enter
+tmux send-keys -t "$BL" "$SCRIPT_DIR/scripts/agents/tester.sh" Enter
+tmux send-keys -t "$BR" "$SCRIPT_DIR/scripts/agents/debugger.sh" Enter
 
 # Start focused on the orchestrator pane
 tmux select-pane -t "$TL"
