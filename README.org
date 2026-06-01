@@ -1,0 +1,159 @@
+#+TITLE: Multi-Agent Coding Workspace
+#+AUTHOR: fanrado
+#+OPTIONS: toc:2 num:nil
+
+* Overview
+
+A reusable tmux-based workspace for multi-agent coding sessions. A single
+script call creates a fully laid-out terminal environment where multiple AI
+coding agents (e.g. Claude Code) can run side by side, each in its own pane,
+all sharing the same working directory.
+
+The workspace is designed to be project-agnostic: point it at any directory
+and it sets up the same consistent layout every time.
+
+* Layout
+
+One tmux session, one window, four panes arranged in a 2×2 grid:
+
+#+BEGIN_EXAMPLE
+┌─────────────────────┬─────────────────────┐
+│                     │                     │
+│    orchestrator     │      agent-1        │
+│                     │                     │
+├─────────────────────┼─────────────────────┤
+│                     │                     │
+│      agent-2        │      monitor        │
+│                     │                     │
+└─────────────────────┴─────────────────────┘
+#+END_EXAMPLE
+
+| Pane           | Position     | Intended use                                  |
+|----------------+--------------+-----------------------------------------------|
+| orchestrator   | top-left     | Top-level agent that plans and delegates work |
+| agent-1        | top-right    | First worker agent                            |
+| agent-2        | bottom-left  | Second worker agent                           |
+| monitor        | bottom-right | Logs, test output, or a watch process         |
+
+Pane names and the session name are configurable in =config/workspace.conf=.
+
+* Usage
+
+** Start the workspace
+
+#+BEGIN_SRC sh
+./workspace.sh
+#+END_SRC
+
+Opens a session named =multiagents= rooted in the current directory.
+
+** Custom session name and directory
+
+#+BEGIN_SRC sh
+./workspace.sh -s myproject -d /path/to/repo
+#+END_SRC
+
+Or via environment variables:
+
+#+BEGIN_SRC sh
+SESSION_NAME=myproject WORKSPACE_DIR=/path/to/repo ./workspace.sh
+#+END_SRC
+
+** Attach to an existing session
+
+#+BEGIN_SRC sh
+./workspace.sh --attach
+# or
+./workspace.sh -s myproject --attach
+#+END_SRC
+
+** Full option reference
+
+#+BEGIN_EXAMPLE
+Usage: workspace.sh [OPTIONS]
+
+Options:
+  -s, --session NAME    Session name (default: multiagents)
+  -d, --dir DIR         Working directory (default: current directory)
+  -a, --attach          Attach to existing session if it exists
+  -h, --help            Show this help
+#+END_EXAMPLE
+
+* Keybindings
+
+These bindings are active inside the workspace session:
+
+| Key   | Action                              |
+|-------+-------------------------------------|
+| =C-q= | Kill the session and all its panes  |
+
+Standard tmux navigation (=C-b= prefix) works as usual for switching panes,
+resizing, scrolling, etc.
+
+* File Structure
+
+#+BEGIN_EXAMPLE
+multiagents-setup/
+├── workspace.sh          # Entry point — creates the tmux session
+├── config/
+│   └── workspace.conf    # Session name, window name, pane titles
+└── scripts/
+    └── tmux_helpers.sh   # Shared tmux functions (split, title, send)
+#+END_EXAMPLE
+
+** =workspace.sh=
+
+The main script. Parses CLI options, checks whether the session already
+exists, creates the tmux session, splits the window into the 2×2 grid using
+stable pane IDs, labels each pane, registers keybindings, and attaches.
+
+** =config/workspace.conf=
+
+Sourced by =workspace.sh= before any tmux commands run. Override any variable
+here or via environment variables to customise the workspace without touching
+the script.
+
+** =scripts/tmux_helpers.sh=
+
+Thin wrappers around tmux primitives. Each split function returns the new
+pane's ID (=%N= format) so subsequent splits always target the correct pane
+regardless of how tmux reindexes pane numbers internally.
+
+* Requirements
+
+- =tmux= ≥ 2.6 (for =select-pane -T= pane title support)
+- =bash= ≥ 4.0
+- =bd= (beads) — issue tracker used for all task management in this workspace
+
+** Installing beads
+
+#+BEGIN_SRC sh
+# Check the beads repository for the latest install instructions
+bd --version
+#+END_SRC
+
+Beads stores issues in a local Dolt database under =.beads/=. Run =bd prime=
+at the start of any session to load full workflow context and available
+commands.
+
+** Beads quick reference
+
+| Command                      | Purpose                          |
+|------------------------------+----------------------------------|
+| =bd prime=                   | Load session context             |
+| =bd ready=                   | Show issues ready to work on     |
+| =bd create --title="..." =   | File a new issue                 |
+| =bd update <id> --claim=     | Claim an issue                   |
+| =bd close <id>=              | Mark an issue complete           |
+| =bd remember "insight"=      | Persist a note across sessions   |
+
+* Extending the Workspace
+
+To add a new pane, agent type, or startup command, the intended extension
+points are:
+
+1. Add a new =PANE_*= variable in =config/workspace.conf=.
+2. Add the corresponding split and title call in =workspace.sh= after the
+   existing four panes are created.
+3. Use =tmux_send= from =scripts/tmux_helpers.sh= to run a startup command
+   inside any pane automatically on launch.
