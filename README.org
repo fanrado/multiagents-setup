@@ -64,34 +64,109 @@ You (orchestrator, tab 1)
 
 See =beads-workflow.org= for the full coordination protocol.
 
+* Installation
+
+** Two-repo mental model
+
+=multiagents-setup= is a standalone tool — it lives in its own git repository
+and is installed once. It is *never* cloned inside your project. Think of it
+the same way you think of =vim= or =make=: the tool lives elsewhere on your
+machine, and you invoke it from whichever project you want to work on.
+
+#+BEGIN_EXAMPLE
+~/ (or any stable location)
+└── multiagents-setup/       ← tool repo, cloned once, never touched by agents
+    ├── workspace.sh
+    ├── agents/
+    ├── scripts/
+    └── .beads/              ← coordination layer, separate from your project
+
+/path/to/your-project/       ← your project repo, unchanged
+└── .worktrees/              ← created at runtime by workspace.sh
+    ├── developer/           ← isolated worktree for features/<name> branch
+    ├── tester/              ← isolated worktree for test/<name> branch
+    └── debugger/            ← isolated worktree for test/<name> branch
+#+END_EXAMPLE
+
+This separation means:
+- Agents can never accidentally commit tooling files into your project.
+- Your project's git history stays clean.
+- The workspace works with any project without any setup inside that project.
+
+** Clone the tool
+
+#+BEGIN_SRC sh
+git clone <multiagents-setup-repo-url> ~/multiagents-setup
+#+END_SRC
+
+Clone it to a stable location. Do not move it afterwards — the alias below
+will point to this path.
+
+** Add a shell alias
+
+Add this to your =~/.zshrc= or =~/.bashrc=:
+
+#+BEGIN_SRC sh
+alias workspace="~/multiagents-setup/workspace.sh"
+#+END_SRC
+
+Reload your shell:
+
+#+BEGIN_SRC sh
+source ~/.zshrc   # or ~/.bashrc
+#+END_SRC
+
+You now have a =workspace= command available from anywhere.
+
 * Usage
+
+** IMPORTANT: always run from inside your project
+
+=workspace.sh= must be run from the root of the project you want to work on,
+not from inside the =multiagents-setup= directory.
+
+#+BEGIN_SRC sh
+cd /path/to/your-project
+workspace
+#+END_SRC
+
+This is because:
+- =WORKSPACE_DIR= defaults to =$(pwd)=, so the agents are rooted in your project.
+- =git worktree= commands operate on the repo in the current directory, which
+  must be your project — not the tooling repo.
+- The tooling scripts resolve their own location via =SCRIPT_DIR= at runtime,
+  so they are always found correctly regardless of where you invoke them from.
+
+Running =workspace.sh= from inside =multiagents-setup/= itself would point the
+agents at the wrong repository.
 
 ** Start the workspace
 
 #+BEGIN_SRC sh
-./workspace.sh
+cd /path/to/your-project
+workspace
 #+END_SRC
 
 Opens a session named =multiagents= rooted in the current directory.
 The developer, tester, and debugger agents start automatically in their panes.
 
-** Custom session name and directory
+** Custom session name
 
 #+BEGIN_SRC sh
-./workspace.sh -s myproject -d /path/to/repo
+workspace -s myproject
 #+END_SRC
 
-Or via environment variables:
+Or via environment variable:
 
 #+BEGIN_SRC sh
-SESSION_NAME=myproject WORKSPACE_DIR=/path/to/repo ./workspace.sh
+SESSION_NAME=myproject workspace
 #+END_SRC
 
 ** Attach to an existing session
 
 #+BEGIN_SRC sh
-./workspace.sh --attach
-./workspace.sh -s myproject --attach
+workspace --attach
+workspace -s myproject --attach
 #+END_SRC
 
 ** Full option reference
@@ -106,12 +181,13 @@ Options:
 
 ** Dispatching a plan phase
 
-Once you have written a =plan-phase= beads issue, dispatch it to the developer:
+Once you have written a =plan-phase= beads issue, dispatch it to the developer
+from the orchestrator pane (tab 1):
 
 #+BEGIN_SRC sh
-./scripts/dispatch.sh <issue-id>
+~/multiagents-setup/scripts/dispatch.sh <issue-id>
 # example:
-./scripts/dispatch.sh myproject-abc
+~/multiagents-setup/scripts/dispatch.sh myproject-abc
 #+END_SRC
 
 The developer agent will see the issue, implement it on the =features/<name>=
