@@ -1,7 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Capture the directory from which the user invoked this script.
+# This becomes the project workspace; -d/--dir can still override it.
+WORKSPACE_DIR="$(pwd)"
+
+# Resolve the real location of this script so that symlinks (e.g. ~/bin/workspace)
+# still find config/ and scripts/ relative to the actual multiagents-setup directory.
+_src="${BASH_SOURCE[0]}"
+while [[ -L "$_src" ]]; do
+    _dir="$(cd "$(dirname "$_src")" && pwd)"
+    _src="$(readlink "$_src")"
+    [[ "$_src" != /* ]] && _src="$_dir/$_src"
+done
+SCRIPT_DIR="$(cd "$(dirname "$_src")" && pwd)"
+unset _src _dir
 
 # shellcheck source=config/workspace.conf
 source "$SCRIPT_DIR/config/workspace.conf"
@@ -85,6 +98,11 @@ tmux bind-key -n C-q kill-session
 tmux send-keys -t "$TR" "$SCRIPT_DIR/scripts/agents/developer.sh" Enter
 tmux send-keys -t "$BL" "$SCRIPT_DIR/scripts/agents/tester.sh" Enter
 tmux send-keys -t "$BR" "$SCRIPT_DIR/scripts/agents/debugger.sh" Enter
+
+# Start event watcher in background; it exits automatically when session ends.
+# Logs: ${TMPDIR:-/tmp}/multiagents-${SESSION_NAME}/watcher.log
+SESSION_NAME="$SESSION_NAME" WORKSPACE_DIR="$WORKSPACE_DIR" "$SCRIPT_DIR/scripts/watcher.sh" &
+disown
 
 # Start focused on the orchestrator pane
 tmux select-pane -t "$TL"
