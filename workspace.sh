@@ -20,19 +20,23 @@ unset _src _dir
 source "$SCRIPT_DIR/config/workspace.conf"
 # shellcheck source=scripts/tmux_helpers.sh
 source "$SCRIPT_DIR/scripts/tmux_helpers.sh"
+# shellcheck source=scripts/preflight.sh
+source "$SCRIPT_DIR/scripts/preflight.sh"
 
 usage() {
     cat <<EOF
 Usage: $(basename "$0") [OPTIONS]
 
-Opens a tmux workspace session with 4 panes in a 2×2 grid.
+Opens a tmux workspace session with a 2×2 agent grid and a logs button pane.
 
 Layout:
   ┌─────────────────┬─────────────────┐
   │  orchestrator   │   developer     │
   ├─────────────────┼─────────────────┤
   │    tester       │   debugger      │
-  └─────────────────┴─────────────────┘
+  ├─────────────────┴─────────────────┤
+  │  [ Logs ]  (click to open log)    │
+  └───────────────────────────────────┘
 
 Options:
   -s, --session NAME    Session name (default: $SESSION_NAME)
@@ -61,6 +65,20 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Preflight: must be a git repo; beads is optional but agents adapt when absent.
+preflight_check_git "$WORKSPACE_DIR" || exit 1
+preflight_check_beads || true   # sets NO_BEADS=1, continues
+
+if [[ -z "${NO_BEADS:-}" ]]; then
+    issue_count=$(preflight_count_issues "$WORKSPACE_DIR" || echo 0)
+    if [[ "$issue_count" -eq 0 ]]; then
+        echo "INFO: No open beads issues. Developer will idle until issues are created."
+    else
+        echo "INFO: $issue_count open issue(s) found."
+    fi
+fi
+export NO_BEADS="${NO_BEADS:-}"
+
 if tmux_session_exists "$SESSION_NAME"; then
     if $attach_only; then
         exec tmux attach-session -t "$SESSION_NAME"
@@ -85,15 +103,41 @@ BL=$(tmux_split_v "$TL" "$WORKSPACE_DIR")             # bottom-left
 # Step 4 — split top-right downward → bottom-right
 BR=$(tmux_split_v "$TR" "$WORKSPACE_DIR")             # bottom-right
 
+# Step 5 — full-width 2-line logs button pane at the very bottom
+LOGS_BTN=$(tmux split-window -v -f -l 2 -t "${SESSION_NAME}:${WINDOW_NAME}" \
+    -c "$WORKSPACE_DIR" -P -F "#{pane_id}")
+
 # Show pane titles in the border header of each pane
 tmux set-option -t "$SESSION_NAME" pane-border-status top
-tmux set-option -t "$SESSION_NAME" pane-border-format " #{pane_title} "
 
 # Label each pane
 tmux_pane_title "$TL" "$PANE_ORCHESTRATOR"
 tmux_pane_title "$TR" "$PANE_DEVELOPER"
 tmux_pane_title "$BL" "$PANE_TESTER"
 tmux_pane_title "$BR" "$PANE_DEBUGGER"
+tmux_pane_title "$LOGS_BTN" "logs"
+
+# Apply unified color theme
+tmux_apply_theme "$SESSION_NAME"
+
+# Store the logs pane ID so the click binding and resize hook can find it
+tmux set-option -t "$SESSION_NAME" @logs_pane_id "$LOGS_BTN"
+
+# Re-enforce 2-line height on every terminal resize so the pane stays anchored at the bottom.
+# #{@logs_pane_id} is a session option expanded by tmux at hook-fire time.
+tmux set-hook -t "$SESSION_NAME" client-resized \
+    'resize-pane -t #{@logs_pane_id} -y 2'
+
+# Left-click on the logs pane → open popup; anywhere else → normal pane select
+tmux bind-key -T root MouseDown1Pane \
+    if-shell -F '#{==:#{pane_id},#{@logs_pane_id}}' \
+    "display-popup -E -w 80% -h 45% -T ' Watcher Log ' \
+     '$SCRIPT_DIR/scripts/show_watcher_log.sh #{session_name}'" \
+    "select-pane -t '#{pane_id}'; send-keys -M"
+
+# Disable mouse border dragging so pane sizes stay fixed
+tmux bind-key -T root MouseDrag1Border    ''
+tmux bind-key -T root MouseDragEnd1Border ''
 
 # C-q kills the session (no prefix needed)
 tmux bind-key -n C-q kill-session
@@ -102,6 +146,7 @@ tmux bind-key -n C-q kill-session
 tmux send-keys -t "$TR" "$SCRIPT_DIR/scripts/agents/developer.sh" Enter
 tmux send-keys -t "$BL" "$SCRIPT_DIR/scripts/agents/tester.sh" Enter
 tmux send-keys -t "$BR" "$SCRIPT_DIR/scripts/agents/debugger.sh" Enter
+tmux send-keys -t "$LOGS_BTN" "$SCRIPT_DIR/scripts/logs_button.sh" Enter
 
 # Start event watcher in background; it exits automatically when session ends.
 # Logs: ${TMPDIR:-/tmp}/multiagents-${SESSION_NAME}/watcher.log
