@@ -10,6 +10,18 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$WORKSPACE_ROOT/config/workspace.conf"
+source "$WORKSPACE_ROOT/scripts/preflight.sh"
+
+# Bail out early if the workspace is not a git repo — nothing useful to watch.
+if ! preflight_check_git "$WORKSPACE_DIR" 2>/dev/null; then
+    echo "[watcher] WORKSPACE_DIR is not a git repo — exiting" >&2
+    exit 0
+fi
+
+BEADS_DISABLED=0
+if ! preflight_check_beads 2>/dev/null; then
+    BEADS_DISABLED=1
+fi
 
 POLL_INTERVAL="${WATCHER_INTERVAL:-5}"
 _state="${TMPDIR:-/tmp}/multiagents-${SESSION_NAME}"
@@ -47,7 +59,7 @@ _pane() {
 touch "$SEEN_FILE"
 # Seed closed-issues so we don't notify about work that predates this session.
 touch "$CLOSED_FILE"
-if [[ -f "$WORKSPACE_ROOT/.beads/issues.jsonl" ]]; then
+if [[ "$BEADS_DISABLED" -eq 0 ]] && [[ -f "$WORKSPACE_ROOT/.beads/issues.jsonl" ]]; then
     while IFS= read -r line; do
         [[ -z "$line" ]] && continue
         id=$(echo "$line"     | grep -o '"id":"[^"]*"'     | head -1 | cut -d'"' -f4)
@@ -70,7 +82,7 @@ while tmux has-session -t "$SESSION_NAME" 2>/dev/null; do
     sleep "$POLL_INTERVAL"
 
     # ── Log new open beads issues; notify orchestrator when issues close ────────
-    if [[ -f "$WORKSPACE_ROOT/.beads/issues.jsonl" ]]; then
+    if [[ "$BEADS_DISABLED" -eq 0 ]] && [[ -f "$WORKSPACE_ROOT/.beads/issues.jsonl" ]]; then
         while IFS= read -r line; do
             [[ -z "$line" ]] && continue
             id=$(echo "$line"     | grep -o '"id":"[^"]*"'     | head -1 | cut -d'"' -f4)
