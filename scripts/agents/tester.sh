@@ -45,6 +45,9 @@ $diff_stat
 
 Write tests for the new feature and run the test suite in $WORKSPACE_DIR. Follow your instructions."
 
+        ts=$(date +%H:%M)
+        "$SCRIPT_DIR/../../scripts/notify_header.sh" "$SESSION_NAME" \
+            "[tester] Tests done: $short ($ts)" 2>/dev/null || true
         echo "[tester] Claude session done. Watching for next commit..."
     else
         sleep "$POLL_INTERVAL"
