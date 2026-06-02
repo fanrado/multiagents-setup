@@ -33,3 +33,19 @@ tmux_send() {
     shift
     tmux send-keys -t "$target" "$*" Enter
 }
+
+# Apply unified color theme to a session.
+# Usage: tmux_apply_theme <session>
+tmux_apply_theme() {
+    local session="$1"
+
+    # Unified pane backgrounds and borders
+    tmux set-option -t "$session" window-style             "bg=$THEME_BG"
+    tmux set-option -t "$session" window-active-style      "bg=$THEME_BG"
+    tmux set-option -t "$session" pane-border-style        "fg=$THEME_BORDER_FG,bg=$THEME_BG"
+    tmux set-option -t "$session" pane-active-border-style "fg=$THEME_ACTIVE_FG,bg=$THEME_BG"
+    tmux set-option -t "$session" pane-border-format       " #[bold]#{pane_title}#[nobold] "
+
+    # Enable mouse (required for the logs pane click binding)
+    tmux set-option -t "$session" mouse on
+}
