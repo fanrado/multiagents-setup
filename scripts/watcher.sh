@@ -15,8 +15,9 @@ POLL_INTERVAL="${WATCHER_INTERVAL:-5}"
 _state="${TMPDIR:-/tmp}/multiagents-${SESSION_NAME}"
 mkdir -p "$_state"
 
-SEEN_FILE="$_state/seen-issues"   # tracks logged issues
-HEAD_FILE="$_state/watcher-head"  # tracks logged commits
+SEEN_FILE="$_state/seen-issues"         # tracks logged open issues
+CLOSED_FILE="$_state/seen-closed"       # tracks issues already notified as closed
+HEAD_FILE="$_state/watcher-head"        # tracks logged commits
 PID_FILE="$_state/watcher.pid"
 LOG_FILE="$_state/watcher.log"
 
@@ -44,12 +45,18 @@ _pane() {
 # Seed seen-issues with non-open issues only.
 # Open issues are left unseeded so the developer is dispatched them on the first poll.
 touch "$SEEN_FILE"
+# Seed closed-issues so we don't notify about work that predates this session.
+touch "$CLOSED_FILE"
 if [[ -f "$WORKSPACE_ROOT/.beads/issues.jsonl" ]]; then
     while IFS= read -r line; do
         [[ -z "$line" ]] && continue
         id=$(echo "$line"     | grep -o '"id":"[^"]*"'     | head -1 | cut -d'"' -f4)
         status=$(echo "$line" | grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4)
-        [[ -n "$id" && "$status" != "open" ]] && echo "$id" >> "$SEEN_FILE"
+        [[ -z "$id" ]] && continue
+        if [[ "$status" != "open" ]]; then
+            echo "$id" >> "$SEEN_FILE"
+            echo "$id" >> "$CLOSED_FILE"
+        fi
     done < "$WORKSPACE_ROOT/.beads/issues.jsonl"
 fi
 
@@ -62,17 +69,27 @@ log "Log: $LOG_FILE"
 while tmux has-session -t "$SESSION_NAME" 2>/dev/null; do
     sleep "$POLL_INTERVAL"
 
-    # ── Log new open beads issues ────────────────────────────────────────────
+    # ── Log new open beads issues; notify orchestrator when issues close ────────
     if [[ -f "$WORKSPACE_ROOT/.beads/issues.jsonl" ]]; then
         while IFS= read -r line; do
             [[ -z "$line" ]] && continue
             id=$(echo "$line"     | grep -o '"id":"[^"]*"'     | head -1 | cut -d'"' -f4)
             status=$(echo "$line" | grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4)
             title=$(echo "$line"  | grep -o '"title":"[^"]*"'  | head -1 | cut -d'"' -f4)
-            [[ "$status" != "open" ]] && continue
-            grep -qxF "$id" "$SEEN_FILE" && continue
-            echo "$id" >> "$SEEN_FILE"
-            log "New open issue: $id — $title"
+            [[ -z "$id" ]] && continue
+
+            if [[ "$status" == "open" ]]; then
+                grep -qxF "$id" "$SEEN_FILE" && continue
+                echo "$id" >> "$SEEN_FILE"
+                log "New open issue: $id — $title"
+            elif [[ "$status" == "closed" ]]; then
+                grep -qxF "$id" "$CLOSED_FILE" && continue
+                echo "$id" >> "$CLOSED_FILE"
+                ts=$(date +%H:%M)
+                log "Issue closed: $id — $title"
+                "$SCRIPT_DIR/notify_header.sh" "$SESSION_NAME" \
+                    "[developer] Done: $title ($ts)" 2>/dev/null || true
+            fi
         done < "$WORKSPACE_ROOT/.beads/issues.jsonl"
     fi
 
