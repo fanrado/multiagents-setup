@@ -82,6 +82,9 @@ while tmux has-session -t "$SESSION_NAME" 2>/dev/null; do
                 grep -qxF "$id" "$SEEN_FILE" && continue
                 echo "$id" >> "$SEEN_FILE"
                 log "New open issue: $id — $title"
+                "$SCRIPT_DIR/dispatch.sh" "$id" "$SESSION_NAME" 2>/dev/null \
+                    && log "Dispatched $id to developer" \
+                    || log "dispatch failed for $id (developer pane not ready?)"
             elif [[ "$status" == "closed" ]]; then
                 grep -qxF "$id" "$CLOSED_FILE" && continue
                 echo "$id" >> "$CLOSED_FILE"
