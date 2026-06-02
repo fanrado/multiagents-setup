@@ -54,9 +54,9 @@ else
     # Mark the issue in_progress so agents and user can see it's been dispatched
     bd update "$ISSUE_ID" --status=in_progress 2>/dev/null || true
 
-    # Inject the start command into the developer pane
+    # Send a natural-language prompt to the Claude agent in the developer pane
     tmux send-keys -t "$DEV_PANE" \
-        "echo '>>> [DISPATCH] Executing plan-phase: $ISSUE_ID' && bd show $ISSUE_ID" \
+        ">>> [DISPATCH] New issue ready: $ISSUE_ID — run 'bd show $ISSUE_ID' to read it, then implement the feature." \
         Enter
 
     echo "Dispatched $ISSUE_ID to developer pane in session '$SESSION'."
