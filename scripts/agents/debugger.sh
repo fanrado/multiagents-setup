@@ -50,6 +50,9 @@ $details
 
 You are on the test/<name> branch. Diagnose and fix the failing tests in $WORKSPACE_DIR following your instructions. Do not touch production code unless it contains a clear bug."
 
+        ts=$(date +%H:%M)
+        "$SCRIPT_DIR/../../scripts/notify_header.sh" "$SESSION_NAME" \
+            "[debugger] Fixed: $report ($ts)" 2>/dev/null || true
         echo "[debugger] Claude session done. Waiting for next test report..."
     else
         sleep "$POLL_INTERVAL"
