@@ -85,6 +85,10 @@ BL=$(tmux_split_v "$TL" "$WORKSPACE_DIR")             # bottom-left
 # Step 4 — split top-right downward → bottom-right
 BR=$(tmux_split_v "$TR" "$WORKSPACE_DIR")             # bottom-right
 
+# Show pane titles in the border header of each pane
+tmux set-option -t "$SESSION_NAME" pane-border-status top
+tmux set-option -t "$SESSION_NAME" pane-border-format " #{pane_title} "
+
 # Label each pane
 tmux_pane_title "$TL" "$PANE_ORCHESTRATOR"
 tmux_pane_title "$TR" "$PANE_DEVELOPER"
