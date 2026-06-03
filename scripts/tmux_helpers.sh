@@ -40,8 +40,8 @@ tmux_apply_theme() {
     local session="$1"
 
     # Unified pane backgrounds and borders
-    tmux set-option -t "$session" window-style             "bg=$THEME_BG"
-    tmux set-option -t "$session" window-active-style      "bg=$THEME_BG"
+    tmux set-option -t "$session" window-style             "fg=$THEME_FG,bg=$THEME_BG"
+    tmux set-option -t "$session" window-active-style      "fg=$THEME_FG,bg=$THEME_BG"
     tmux set-option -t "$session" pane-border-style        "fg=$THEME_BORDER_FG,bg=$THEME_BG"
     tmux set-option -t "$session" pane-active-border-style "fg=$THEME_ACTIVE_FG,bg=$THEME_BG"
     tmux set-option -t "$session" pane-border-format       " #[bold]#{pane_title}#[nobold] "
