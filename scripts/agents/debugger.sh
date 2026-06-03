@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Debugger agent — idles until the tester opens a "test report" beads issue,
-# then starts an interactive Claude session to fix the failures on test/<name>.
+# Debugger agent — runs Claude in a restart loop so it stays alive between test reports.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -10,7 +9,6 @@ source "$WORKSPACE_ROOT/config/workspace.conf"
 bd() { (cd "$WORKSPACE_DIR" && command bd "$@"); }
 
 INSTRUCTIONS="$WORKSPACE_ROOT/agents/debugger.md"
-POLL_INTERVAL="${DEBUGGER_POLL_INTERVAL:-10}"
 STATE_DIR="${TMPDIR:-/tmp}/multiagents-${SESSION_NAME}"
 SEEN_FILE="$STATE_DIR/debugger-seen"
 mkdir -p "$STATE_DIR"
@@ -19,7 +17,10 @@ touch "$SEEN_FILE"
 echo "[debugger] WORKSPACE_ROOT : $WORKSPACE_ROOT"
 echo "[debugger] WORKSPACE_DIR  : $WORKSPACE_DIR"
 echo "[debugger] bd runs from   : $WORKSPACE_DIR"
-echo "[debugger] Waiting for test report issues every ${POLL_INTERVAL}s..."
+
+POLL_PROMPT="No open test report issues right now. Run 'bd list --status=open' every 30 seconds. As soon as a 'Test report' issue appears, read it with 'bd show <id>', diagnose and fix the failures, then close the issue. Keep looping."
+
+echo "[debugger] Starting Claude (restart loop)..."
 
 while true; do
     # Look for open test-report issues not yet handled by this session
@@ -39,22 +40,31 @@ while true; do
         echo "$report" >> "$SEEN_FILE"
         details=$(bd show "$report" 2>/dev/null || echo "(could not load report)")
 
-        echo "[debugger] Test report found: $report — starting Claude on test/<name> branch..."
-        claude \
-            --dangerously-skip-permissions \
-            --add-dir "$WORKSPACE_DIR" \
-            --append-system-prompt "$(cat "$INSTRUCTIONS")" \
-            "A new failing test report has been filed: $report
+        PROMPT="A new failing test report has been filed: $report
 
 $details
 
 You are on the test/<name> branch. Diagnose and fix the failing tests in $WORKSPACE_DIR following your instructions. Do not touch production code unless it contains a clear bug."
+        echo "[debugger] Test report found: $report — starting Claude..."
+        work=true
+    else
+        PROMPT="$POLL_PROMPT"
+        echo "[debugger] No test reports — Claude will poll and wait"
+        work=false
+    fi
 
+    claude \
+        --dangerously-skip-permissions \
+        --add-dir "$WORKSPACE_DIR" \
+        --append-system-prompt "$(cat "$INSTRUCTIONS")" \
+        "$PROMPT" || true
+
+    if $work; then
         ts=$(date +%H:%M)
         "$SCRIPT_DIR/../../scripts/notify_header.sh" "$SESSION_NAME" \
             "[debugger] Fixed: $report ($ts)" 2>/dev/null || true
-        echo "[debugger] Claude session done. Waiting for next test report..."
-    else
-        sleep "$POLL_INTERVAL"
     fi
+
+    echo "[debugger] Claude exited. Restarting in 15s..."
+    sleep 15
 done
