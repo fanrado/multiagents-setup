@@ -120,13 +120,16 @@ tmux_pane_title "$LOGS_BTN" "logs"
 # Apply unified color theme
 tmux_apply_theme "$SESSION_NAME"
 
-# Store the logs pane ID so the click binding and resize hook can find it
+# Store all pane IDs so the resize hook can redistribute space proportionally
 tmux set-option -t "$SESSION_NAME" @logs_pane_id "$LOGS_BTN"
+tmux set-option -t "$SESSION_NAME" @tl_pane_id   "$TL"
+tmux set-option -t "$SESSION_NAME" @tr_pane_id   "$TR"
+tmux set-option -t "$SESSION_NAME" @bl_pane_id   "$BL"
+tmux set-option -t "$SESSION_NAME" @br_pane_id   "$BR"
 
-# Re-enforce 2-line height on every terminal resize so the pane stays anchored at the bottom.
-# #{@logs_pane_id} is a session option expanded by tmux at hook-fire time.
+# On every terminal resize: evenly distribute the 2×2 grid and keep logs at 2 lines.
 tmux set-hook -t "$SESSION_NAME" client-resized \
-    'resize-pane -t #{@logs_pane_id} -y 2'
+    "run-shell '$SCRIPT_DIR/scripts/resize_panes.sh #{session_name}'"
 
 # Left-click on the logs pane → open popup; anywhere else → normal pane select
 tmux bind-key -T root MouseDown1Pane \
