@@ -6,6 +6,35 @@
 *Work in progress.* This workspace is under active development — expect rough edges and breaking changes.
 #+END_QUOTE
 
+* Important Notes
+
+** Prerequisites
+
+This workspace requires an active *Claude subscription plan*. The developer,
+tester, and debugger agents each run a persistent Claude Code process — all
+three consume API capacity simultaneously.
+
+** What this workspace does (and does not) guarantee
+
+The developer → tester → debugger pipeline is designed to produce code that
+passes its own tests and follows the plan you describe in beads issues. It does
+*not* guarantee correctness beyond what the tests cover.
+
+** Your responsibility as orchestrator
+
+The quality of the output is directly tied to the quality of your plan:
+
+- *Make each plan phase unambiguous.* If a step can be implemented in more than
+  one reasonable way, the agent will pick one — and it may not be the one you
+  had in mind. Narrow the scope until there is only one obvious path.
+- *Keep each phase small.* One phase should touch at most one or two files and
+  have a single, verifiable outcome. Larger steps increase the chance of
+  divergence between your expectation and the result.
+- *Verify and validate every result.* AI tooling can accelerate coding
+  significantly, but it can also produce subtly wrong output. Even a
+  well-structured, detailed plan does not remove the need for human review.
+  Treat agent output as a fast first draft, not a finished product.
+
 * Overview
 
 A reusable tmux-based workspace for multi-agent coding sessions. A single
