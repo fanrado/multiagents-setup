@@ -134,7 +134,7 @@ tmux set-hook -t "$SESSION_NAME" client-resized \
 # Left-click on the logs pane → open popup; anywhere else → normal pane select
 tmux bind-key -T root MouseDown1Pane \
     if-shell -F '#{==:#{pane_id},#{@logs_pane_id}}' \
-    "display-popup -E -w 80% -h 45% -T ' Watcher Log ' \
+    "display-popup -E -w 80% -h 70% -T ' Watcher Log ' \
      '$SCRIPT_DIR/scripts/show_watcher_log.sh #{session_name}'" \
     "select-pane -t '#{pane_id}'; send-keys -M"
 
