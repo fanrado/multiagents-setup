@@ -5,7 +5,7 @@ SESSION="${1:-multiagents}"
 LOG_FILE="${TMPDIR:-/tmp}/multiagents-${SESSION}/watcher.log"
 
 if [[ -f "$LOG_FILE" ]]; then
-    tail -n 150 "$LOG_FILE"
+    tail -n 300 "$LOG_FILE"
 else
     echo "(no log yet — watcher has not started)"
 fi

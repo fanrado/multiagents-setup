@@ -11,6 +11,7 @@ bd() { (cd "$WORKSPACE_DIR" && command bd "$@"); }
 INSTRUCTIONS="$WORKSPACE_ROOT/agents/debugger.md"
 STATE_DIR="${TMPDIR:-/tmp}/multiagents-${SESSION_NAME}"
 SEEN_FILE="$STATE_DIR/debugger-seen"
+LOG_FILE="$STATE_DIR/watcher.log"
 mkdir -p "$STATE_DIR"
 touch "$SEEN_FILE"
 
@@ -53,16 +54,23 @@ You are on the test/<name> branch. Diagnose and fix the failing tests in $WORKSP
         work=false
     fi
 
-    claude \
-        --dangerously-skip-permissions \
-        --add-dir "$WORKSPACE_DIR" \
-        --append-system-prompt "$(cat "$INSTRUCTIONS")" \
-        "$PROMPT" || true
-
     if $work; then
+        echo "[debugger $(date +%H:%M:%S)] === debug session: $report ===" >> "$LOG_FILE"
+        claude \
+            --dangerously-skip-permissions \
+            --add-dir "$WORKSPACE_DIR" \
+            --append-system-prompt "$(cat "$INSTRUCTIONS")" \
+            "$PROMPT" 2>&1 | tee -a "$LOG_FILE" || true
+        echo "[debugger $(date +%H:%M:%S)] === done ===" >> "$LOG_FILE"
         ts=$(date +%H:%M)
         "$SCRIPT_DIR/../../scripts/notify_header.sh" "$SESSION_NAME" \
             "[debugger] Fixed: $report ($ts)" 2>/dev/null || true
+    else
+        claude \
+            --dangerously-skip-permissions \
+            --add-dir "$WORKSPACE_DIR" \
+            --append-system-prompt "$(cat "$INSTRUCTIONS")" \
+            "$PROMPT" || true
     fi
 
     echo "[debugger] Claude exited. Restarting in 15s..."

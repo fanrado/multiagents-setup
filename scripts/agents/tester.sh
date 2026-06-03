@@ -11,6 +11,7 @@ bd() { (cd "$WORKSPACE_DIR" && command bd "$@"); }
 INSTRUCTIONS="$WORKSPACE_ROOT/agents/tester.md"
 STATE_DIR="${TMPDIR:-/tmp}/multiagents-${SESSION_NAME}"
 HEAD_FILE="$STATE_DIR/tester-head"
+LOG_FILE="$STATE_DIR/watcher.log"
 mkdir -p "$STATE_DIR"
 
 # Seed with current HEAD so we don't re-test commits that predate this session.
@@ -48,16 +49,23 @@ Write tests for the new feature and run the test suite in $WORKSPACE_DIR. Follow
         work=false
     fi
 
-    claude \
-        --dangerously-skip-permissions \
-        --add-dir "$WORKSPACE_DIR" \
-        --append-system-prompt "$(cat "$INSTRUCTIONS")" \
-        "$PROMPT" || true
-
     if $work; then
+        echo "[tester $(date +%H:%M:%S)] === test run: $short ===" >> "$LOG_FILE"
+        claude \
+            --dangerously-skip-permissions \
+            --add-dir "$WORKSPACE_DIR" \
+            --append-system-prompt "$(cat "$INSTRUCTIONS")" \
+            "$PROMPT" 2>&1 | tee -a "$LOG_FILE" || true
+        echo "[tester $(date +%H:%M:%S)] === done ===" >> "$LOG_FILE"
         ts=$(date +%H:%M)
         "$SCRIPT_DIR/../../scripts/notify_header.sh" "$SESSION_NAME" \
             "[tester] Tests done: $short ($ts)" 2>/dev/null || true
+    else
+        claude \
+            --dangerously-skip-permissions \
+            --add-dir "$WORKSPACE_DIR" \
+            --append-system-prompt "$(cat "$INSTRUCTIONS")" \
+            "$PROMPT" || true
     fi
 
     echo "[tester] Claude exited. Restarting in 15s..."
