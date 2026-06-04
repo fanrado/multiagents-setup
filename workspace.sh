@@ -42,6 +42,7 @@ Options:
   -s, --session NAME    Session name (default: $SESSION_NAME)
   -d, --dir DIR         Working directory (default: current directory)
   -a, --attach          Attach to existing session if it exists
+  -l, --list            List currently running workspace sessions
   -h, --help            Show this help
 
 Keybindings (inside the session):
@@ -53,6 +54,18 @@ Environment variables:
 EOF
 }
 
+list_workspaces() {
+    if ! tmux list-sessions 2>/dev/null | grep -q .; then
+        echo "No running workspace sessions."
+        return
+    fi
+    printf "%-20s  %-6s  %-20s  %s\n" "SESSION" "WINDOWS" "CREATED" "ATTACHED"
+    tmux list-sessions -F "#{session_name}  #{session_windows}  #{session_created_string}  #{?session_attached,yes,no}" 2>/dev/null \
+        | while IFS='  ' read -r name windows created attached; do
+            printf "%-20s  %-6s  %-20s  %s\n" "$name" "$windows" "$created" "$attached"
+          done
+}
+
 attach_only=false
 
 while [[ $# -gt 0 ]]; do
@@ -60,6 +73,7 @@ while [[ $# -gt 0 ]]; do
         -s|--session) SESSION_NAME="$2"; shift 2 ;;
         -d|--dir)     WORKSPACE_DIR="$2"; shift 2 ;;
         -a|--attach)  attach_only=true; shift ;;
+        -l|--list)    list_workspaces; exit 0 ;;
         -h|--help)    usage; exit 0 ;;
         *) echo "Unknown option: $1" >&2; usage; exit 1 ;;
     esac
