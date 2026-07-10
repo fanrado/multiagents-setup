@@ -10,6 +10,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../config/workspace.conf
 source "$SCRIPT_DIR/../config/workspace.conf"
 
+# Run bd against the project repo (WORKSPACE_DIR), not dispatch.sh's ambient cwd,
+# which may differ when the workspace was started with -d/--dir.
+bd() { (cd "$WORKSPACE_DIR" && command bd "$@"); }
+
 FREE_FORM_MSG=""
 ISSUE_ID=""
 
