@@ -59,7 +59,7 @@ _pane() {
 touch "$SEEN_FILE"
 # Seed closed-issues so we don't notify about work that predates this session.
 touch "$CLOSED_FILE"
-if [[ "$BEADS_DISABLED" -eq 0 ]] && [[ -f "$WORKSPACE_ROOT/.beads/issues.jsonl" ]]; then
+if [[ "$BEADS_DISABLED" -eq 0 ]] && [[ -f "$WORKSPACE_DIR/.beads/issues.jsonl" ]]; then
     while IFS= read -r line; do
         [[ -z "$line" ]] && continue
         id=$(echo "$line"     | grep -o '"id":"[^"]*"'     | head -1 | cut -d'"' -f4)
@@ -69,7 +69,7 @@ if [[ "$BEADS_DISABLED" -eq 0 ]] && [[ -f "$WORKSPACE_ROOT/.beads/issues.jsonl" 
             echo "$id" >> "$SEEN_FILE"
             echo "$id" >> "$CLOSED_FILE"
         fi
-    done < "$WORKSPACE_ROOT/.beads/issues.jsonl"
+    done < "$WORKSPACE_DIR/.beads/issues.jsonl"
 fi
 
 # Seed HEAD from the project repo (WORKSPACE_DIR), not the setup repo
@@ -82,7 +82,7 @@ while tmux has-session -t "$SESSION_NAME" 2>/dev/null; do
     sleep "$POLL_INTERVAL"
 
     # ── Log new open beads issues; notify orchestrator when issues close ────────
-    if [[ "$BEADS_DISABLED" -eq 0 ]] && [[ -f "$WORKSPACE_ROOT/.beads/issues.jsonl" ]]; then
+    if [[ "$BEADS_DISABLED" -eq 0 ]] && [[ -f "$WORKSPACE_DIR/.beads/issues.jsonl" ]]; then
         while IFS= read -r line; do
             [[ -z "$line" ]] && continue
             id=$(echo "$line"     | grep -o '"id":"[^"]*"'     | head -1 | cut -d'"' -f4)
@@ -105,7 +105,7 @@ while tmux has-session -t "$SESSION_NAME" 2>/dev/null; do
                 "$SCRIPT_DIR/notify_header.sh" "$SESSION_NAME" \
                     "[developer] Done: $title ($ts)" 2>/dev/null || true
             fi
-        done < "$WORKSPACE_ROOT/.beads/issues.jsonl"
+        done < "$WORKSPACE_DIR/.beads/issues.jsonl"
     fi
 
     # ── Log new git commits ──────────────────────────────────────────────────
