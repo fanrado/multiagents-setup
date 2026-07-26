@@ -38,6 +38,10 @@ Layout:
   │  [ Logs ]  (click to open log)    │
   └───────────────────────────────────┘
 
+Plus a hidden "runner" window (not shown above, switch with C-b w): a
+persistent shell that test/build commands run in via scripts/run_in_watcher.sh,
+so their output streams live into the Watcher Log.
+
 Options:
   -s, --session NAME    Session name (default: $SESSION_NAME)
   -d, --dir DIR         Working directory (default: current directory)
@@ -145,6 +149,13 @@ tmux set-option -t "$SESSION_NAME" @br_pane_id   "$BR"
 tmux set-hook -t "$SESSION_NAME" client-resized \
     "run-shell '$SCRIPT_DIR/scripts/resize_panes.sh #{session_name}'"
 
+# Step 6 — hidden "runner" window: a persistent shell that executes commands
+# submitted via scripts/run_in_watcher.sh, so tester/debugger test runs are
+# real live processes streaming into the Watcher Log, not something buried
+# inside an individual agent's own Bash-tool sandbox. Not part of the visible
+# 2x2 grid; switch to it with tmux's window list (C-b w) to watch it directly.
+tmux new-window -d -n runner -t "$SESSION_NAME" -c "$WORKSPACE_DIR"
+
 # Left-click on the logs pane → open popup; anywhere else → normal pane select
 tmux bind-key -T root MouseDown1Pane \
     if-shell -F '#{==:#{pane_id},#{@logs_pane_id}}' \
@@ -168,6 +179,7 @@ tmux send-keys -t "$TR" "$SCRIPT_DIR/scripts/agents/developer.sh" Enter
 tmux send-keys -t "$BL" "$SCRIPT_DIR/scripts/agents/tester.sh" Enter
 tmux send-keys -t "$BR" "$SCRIPT_DIR/scripts/agents/debugger.sh" Enter
 tmux send-keys -t "$LOGS_BTN" "$SCRIPT_DIR/scripts/logs_button.sh" Enter
+tmux send-keys -t "${SESSION_NAME}:runner" "$SCRIPT_DIR/scripts/agents/runner.sh" Enter
 
 # Start event watcher in background; it exits automatically when session ends.
 # Logs: ${TMPDIR:-/tmp}/multiagents-${SESSION_NAME}/watcher.log
