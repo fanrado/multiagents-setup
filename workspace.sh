@@ -160,6 +160,7 @@ tmux bind-key -T root MouseDragEnd1Border ''
 tmux bind-key -n C-q kill-session
 
 # Launch agents in their respective panes
+tmux send-keys -t "$TL" "$SCRIPT_DIR/scripts/agents/orchestrator.sh" Enter
 tmux send-keys -t "$TR" "$SCRIPT_DIR/scripts/agents/developer.sh" Enter
 tmux send-keys -t "$BL" "$SCRIPT_DIR/scripts/agents/tester.sh" Enter
 tmux send-keys -t "$BR" "$SCRIPT_DIR/scripts/agents/debugger.sh" Enter
