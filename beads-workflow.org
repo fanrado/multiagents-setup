@@ -22,34 +22,47 @@ only for immediate human-visible alerts.
 #+BEGIN_EXAMPLE
 open → in_progress → closed
          │
-         └── blocked  (needs-refinement: plan too broad, waiting on user)
+         └── blocked  (needs-refinement: too broad OR too vague, waiting on user)
 #+END_EXAMPLE
 
 | Status              | Set by       | Meaning                                              |
 |---------------------+--------------+------------------------------------------------------|
 | =open=              | Creator      | Ready to be picked up                                |
 | =in_progress=       | Agent        | Work has started                                     |
-| =blocked=           | Developer    | Phase needs refinement before it can proceed         |
+| =blocked=           | Developer    | Step needs refinement before it can proceed          |
 | =closed=            | Agent / User | Work is complete                                     |
 
 * Issue Conventions
 
 ** plan-phase
 
-Created by the user (or orchestrator agent) in tab 1 — but not until the full
-plan has been drafted in conversation and explicitly validated by the human.
-The developer agent treats any open =plan-phase= issue as actionable and
-picks it up immediately, so issue creation is the point of no return, not a
-checkpoint. See =agents/orchestrator.md= for the exact rule. Each issue must:
-- Cover changes to at most 2 files.
-- Include enough context that the developer agent can implement without asking
-  questions (except to escalate scope violations).
+A plan has two levels: **phases** (themed groupings, human-facing only, not
+beads issues) and **steps** (the atomic dispatchable unit — one =plan-phase=
+beads issue per step). See =agents/orchestrator.md= for the full Phase/Step
+rules. Created by the user (or orchestrator agent) in tab 1 — but not until
+the full plan has been drafted in conversation and explicitly validated by
+the human. The developer agent treats any open =plan-phase= issue as
+actionable and picks it up immediately, so issue creation is the point of no
+return, not a checkpoint. The orchestrator's session has Edit/Write/
+NotebookEdit disabled at the tool level — it can only plan, never implement.
+Each issue must:
+- Cover changes to at most 2 files — 1 file is the target, not just the ceiling.
+- Name the specific file(s) and change, not just the goal — enough that the
+  developer agent can implement without asking questions or picking between
+  multiple reasonable approaches (except to escalate scope/clarity
+  violations, see below).
 - Be dispatched explicitly via =scripts/dispatch.sh <issue-id>=.
+
+If the developer finds a dispatched step too broad (>2 files) or too vague
+(no single unambiguous implementation), it runs =scripts/notify.sh= to alert
+tab 1 and sets the issue to =blocked= instead of guessing — see
+=agents/developer.md=. The orchestrator then rewrites the step's description
+and reopens it.
 
 Suggested fields:
 #+BEGIN_EXAMPLE
---title="<short imperative summary>"
---description="What to build and why. Files involved: <file1>, <file2>."
+--title="Phase <N>/Step <M>: <short imperative summary>"
+--description="What to build and why. File(s): <file1> (<file2>)."
 --type=task
 --priority=<0-4>
 #+END_EXAMPLE
@@ -101,7 +114,8 @@ User (tab 1)
 Developer (tab 2)
   │  receives issue ID via tmux, marks in_progress
   │  implements feature on features/<name> branch
-  │  if scope > 2 files: scripts/notify.sh → tab 1, marks blocked
+  │  if scope > 2 files OR the step is too vague to implement without
+  │    guessing: scripts/notify.sh → tab 1, marks blocked
   │  on success: closes plan-phase, runs scripts/sync.sh to-test <name>
   ▼
 Tester (tab 3)                         [on test/<name> branch]
