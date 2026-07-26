@@ -34,6 +34,11 @@ The quality of the output is directly tied to the quality of your plan:
   significantly, but it can also produce subtly wrong output. Even a
   well-structured, detailed plan does not remove the need for human review.
   Treat agent output as a fast first draft, not a finished product.
+- *Don't create the beads issue until the plan is fully validated.* The
+  developer agent picks up any open =plan-phase= issue immediately — there is
+  no second gate. Discuss and refine the plan in conversation first; only
+  once you explicitly approve it should =agents/orchestrator.md= create and
+  dispatch the issue(s). See =agents/orchestrator.md= for the exact rule.
 
 * Overview
 
@@ -64,7 +69,9 @@ One tmux session, one window, four panes arranged in a 2×2 grid:
 
 | Pane          | Branch            | Role                                               |
 |---------------+-------------------+----------------------------------------------------|
-| orchestrator  | =features/<name>= | You. Write plans as beads issues, dispatch phases  |
+| orchestrator  | =features/<name>= | You + Claude. Draft and validate the plan in       |
+|               |                   | conversation first; only once it's fully approved  |
+|               |                   | are beads issues created and dispatched            |
 | developer     | =features/<name>= | Implements one plan phase at a time, no tests      |
 | tester        | =test/<name>=     | Writes and runs unit tests for each new feature    |
 | debugger      | =test/<name>=     | Fixes failing tests, iterates with tester          |
@@ -73,8 +80,10 @@ One tmux session, one window, four panes arranged in a 2×2 grid:
 
 #+BEGIN_EXAMPLE
 You (orchestrator, tab 1)
-  │  1. Write plan-phase beads issues (each scoped to ≤ 2 files)
-  │  2. Run: ./scripts/dispatch.sh <issue-id>
+  │  1. Draft and refine the plan in conversation (no beads issues yet)
+  │  2. Once you explicitly approve the full plan, phase-by-phase
+  │     plan-phase beads issues are created (each scoped to ≤ 2 files)
+  │  3. Run: ./scripts/dispatch.sh <issue-id>
   ▼
 Developer (tab 2)  [features/<name> branch]
   │  Reads the issue, implements the feature, commits
@@ -270,6 +279,7 @@ multiagents-setup/
 ├── config/
 │   └── workspace.conf         # Session name, window name, pane titles
 ├── agents/
+│   ├── orchestrator.md        # Orchestrator agent instructions (CLAUDE.md)
 │   ├── developer.md           # Developer agent instructions (CLAUDE.md)
 │   ├── tester.md              # Tester agent instructions (CLAUDE.md)
 │   └── debugger.md            # Debugger agent instructions (CLAUDE.md)
@@ -279,6 +289,7 @@ multiagents-setup/
     ├── notify.sh               # Send an alert to the orchestrator pane
     ├── sync.sh                 # Sync between features/<name> and test/<name>
     └── agents/
+        ├── orchestrator.sh     # Launch orchestrator Claude Code agent
         ├── developer.sh        # Launch developer Claude Code agent
         ├── tester.sh           # Launch tester Claude Code agent
         └── debugger.sh         # Launch debugger Claude Code agent
