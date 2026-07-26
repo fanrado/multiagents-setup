@@ -29,14 +29,19 @@ fixes back to the feature branch and request user validation.
 4. **Diagnose and fix** the failing code on `test/<name>` branch:
    - Read the failing test and the production code it exercises.
    - Apply the minimal fix needed.
+   - Re-run the failing test to confirm the fix, through the shared runner
+     rather than your own Bash tool, so the output streams live into the
+     Watcher Log same as the tester's runs do:
+     ```bash
+     ./scripts/run_in_watcher.sh $SESSION_NAME "<targeted test command>"
+     ```
    - Commit: `git add -p && git commit -m "fix: <root cause summary>"`
 
 5. **Signal the tester to rerun:**
    ```bash
-   SESSION_NAME=$(bd memories branch:current | awk '{print $NF}')
    TESTER_PANE=$(tmux list-panes -t "$SESSION_NAME" -F "#{pane_id} #{pane_title}" \
        | awk '$2 == "tester" { print $1; exit }')
-   tmux send-keys -t "$TESTER_PANE" "echo '>>> [RERUN] Please rerun tests for <test-report-id>'" Enter
+   tmux send-keys -t "$TESTER_PANE" ">>> [RERUN] Please rerun tests for <test-report-id>" Enter
    ```
 
 6. **Wait for a new test-report.** If it still fails, repeat from step 2.
@@ -83,5 +88,6 @@ bd create --title="..." --description="..." --type=task
 bd close <id> --reason="..."
 bd memories <keyword>
 ./scripts/sync.sh to-feature <feature-name>
-./scripts/notify.sh <session> "<message>"
+./scripts/notify.sh $SESSION_NAME "<message>"
+./scripts/run_in_watcher.sh $SESSION_NAME "<test command>"
 ```
