@@ -46,7 +46,7 @@ Options:
   -h, --help            Show this help
 
 Keybindings (inside the session):
-  C-q               Kill the session and all its panes
+  C-q               Stop all agent processes and the watcher, then kill the session
 
 Environment variables:
   SESSION_NAME          Override default session name
@@ -156,8 +156,11 @@ tmux bind-key -T root MouseDown1Pane \
 tmux bind-key -T root MouseDrag1Border    ''
 tmux bind-key -T root MouseDragEnd1Border ''
 
-# C-q kills the session (no prefix needed)
-tmux bind-key -n C-q kill-session
+# C-q kills the session (no prefix needed) — routed through quit_workspace.sh
+# so every pane's restart loop and claude child is actually stopped, not just
+# detached, and the watcher is stopped explicitly instead of waiting out its
+# poll interval.
+tmux bind-key -n C-q run-shell "$SCRIPT_DIR/scripts/quit_workspace.sh #{session_name}"
 
 # Launch agents in their respective panes
 tmux send-keys -t "$TL" "$SCRIPT_DIR/scripts/agents/orchestrator.sh" Enter
