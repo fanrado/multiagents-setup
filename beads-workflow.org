@@ -36,7 +36,11 @@ open → in_progress → closed
 
 ** plan-phase
 
-Created by the user (or orchestrator agent) in tab 1. Each issue must:
+Created by the user (or orchestrator agent) in tab 1 — but not until the full
+plan has been drafted in conversation and explicitly validated by the human.
+The developer agent treats any open =plan-phase= issue as actionable and
+picks it up immediately, so issue creation is the point of no return, not a
+checkpoint. See =agents/orchestrator.md= for the exact rule. Each issue must:
 - Cover changes to at most 2 files.
 - Include enough context that the developer agent can implement without asking
   questions (except to escalate scope violations).
@@ -89,8 +93,10 @@ Search with: =bd memories <keyword>=
 
 #+BEGIN_EXAMPLE
 User (tab 1)
-  │  writes plan-phase issues in beads
-  │  runs: ./scripts/dispatch.sh <issue-id>
+  │  drafts and refines the plan in conversation — no beads issues yet
+  │  once the full plan is explicitly approved:
+  │    writes plan-phase issues in beads
+  │    runs: ./scripts/dispatch.sh <issue-id>
   ▼
 Developer (tab 2)
   │  receives issue ID via tmux, marks in_progress
