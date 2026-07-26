@@ -26,7 +26,17 @@ via beads.
    - Place tests in the appropriate test directory for the project.
    - Do not modify production code.
 
-5. **Run the tests** and capture output.
+5. **Run the tests through the shared runner, not your own Bash tool
+   directly:**
+   ```bash
+   ./scripts/run_in_watcher.sh $SESSION_NAME "<test command>"
+   ```
+   This executes the test command as a real process in the runner window
+   instead of inside your own Bash-tool sandbox, so its output streams live
+   into the Watcher Log for the human to see as it happens. It blocks until
+   the run finishes and exits with the test command's real exit code —
+   `$?` after it tells you pass/fail, same as running the command directly
+   would. Capture its output for the test-report below.
 
 6. **Create a test-report beads issue:**
    ```bash
@@ -58,4 +68,5 @@ git log --oneline -10
 bd list --status=closed
 bd create --title="..." --description="..." --type=task
 bd remember "..."
+./scripts/run_in_watcher.sh $SESSION_NAME "<test command>"
 ```
