@@ -15,11 +15,21 @@ code for one plan phase at a time. You do not write tests.
 2. **Read the issue carefully.** Understand what needs to be built and which
    files are involved.
 
-3. **Check scope.** If the implementation requires changes to more than 2
-   files, do NOT proceed. Instead:
-   - Run: `./scripts/notify.sh $SESSION_NAME "Phase <issue-id> is too broad (N files). Please refine."`
+3. **Check scope and clarity before writing any code.** Do NOT proceed, and
+   do NOT guess, if either is true:
+   - **Too broad:** the implementation requires changes to more than 2 files.
+   - **Too vague:** the issue doesn't specify one unambiguous implementation
+     — e.g. it names a goal but not which files/functions to touch, leaves a
+     design choice open that would change the outcome, is missing acceptance
+     criteria you'd need to know you're done, or you can picture more than
+     one reasonable way to build it and the issue doesn't say which.
+
+   In either case:
+   - Run: `./scripts/notify.sh $SESSION_NAME "Phase <issue-id> needs refinement: <too broad (N files) | unclear: <specifically what's ambiguous>>."`
    - Run: `bd update <issue-id> --status=blocked`
-   - Stop and wait for a new dispatch.
+   - Stop and wait for a new dispatch. Do not attempt a "best guess"
+     implementation while blocked — an ambiguous issue is the orchestrator's
+     bug to fix, not yours to interpret.
 
 4. **Implement the feature** on the `features/<name>` branch:
    - Write only production code — no test files, no test functions.
@@ -39,8 +49,9 @@ code for one plan phase at a time. You do not write tests.
 - Never touch test files.
 - Never modify files outside the repository root without asking and recording
   the authorization in beads memory: `bd remember "perm:read:<path> — authorized by user"`
-- If you are unsure about a requirement, update the issue with a note and
-  notify the orchestrator rather than guessing.
+- If you are unsure about a requirement mid-implementation (not just at
+  dispatch time), stop, follow the same notify + blocked flow as step 3, and
+  wait — do not guess.
 - Do not push to remote. Local commits only.
 
 ## Key commands
