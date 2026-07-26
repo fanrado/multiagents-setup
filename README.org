@@ -24,12 +24,22 @@ passes its own tests and follows the plan you describe in beads issues. It does
 
 The quality of the output is directly tied to the quality of your plan:
 
-- *Make each plan phase unambiguous.* If a step can be implemented in more than
-  one reasonable way, the agent will pick one — and it may not be the one you
-  had in mind. Narrow the scope until there is only one obvious path.
-- *Keep each phase small.* One phase should touch at most one or two files and
-  have a single, verifiable outcome. Larger steps increase the chance of
-  divergence between your expectation and the result.
+- *Structure the plan as phases containing steps.* A phase is a themed group
+  (human-facing only, not a beads issue); each step inside it is the atomic
+  unit that becomes one =plan-phase= beads issue. See =agents/orchestrator.md=.
+- *Make each step unambiguous.* If a step can be implemented in more than one
+  reasonable way, the agent will pick one — and it may not be the one you had
+  in mind. Narrow it until there is only one obvious path. The developer
+  agent is required to bounce a vague step back to you (via
+  =scripts/notify.sh=) rather than guess — treat that alert as your plan's
+  bug, not the developer's.
+- *Keep each step small.* At most two files, and one is the target, not just
+  the ceiling. Larger steps increase the chance of divergence between your
+  expectation and the result.
+- *The orchestrator can't write code even if it tried.* Edit/Write/
+  NotebookEdit are disabled at the tool level for the orchestrator's Claude
+  session (see =scripts/agents/orchestrator.sh=) — it plans, the developer
+  implements.
 - *Verify and validate every result.* AI tooling can accelerate coding
   significantly, but it can also produce subtly wrong output. Even a
   well-structured, detailed plan does not remove the need for human review.
@@ -80,14 +90,15 @@ One tmux session, one window, four panes arranged in a 2×2 grid:
 
 #+BEGIN_EXAMPLE
 You (orchestrator, tab 1)
-  │  1. Draft and refine the plan in conversation (no beads issues yet)
-  │  2. Once you explicitly approve the full plan, phase-by-phase
-  │     plan-phase beads issues are created (each scoped to ≤ 2 files)
+  │  1. Draft the plan as phases, each broken into steps
+  │     (no beads issues yet — you cannot edit files, only plan)
+  │  2. Once you explicitly approve the full plan, one plan-phase
+  │     beads issue is created per step (≤ 2 files, 1 ideal)
   │  3. Run: ./scripts/dispatch.sh <issue-id>
   ▼
 Developer (tab 2)  [features/<name> branch]
   │  Reads the issue, implements the feature, commits
-  │  If scope > 2 files → notifies you and waits for refinement
+  │  If scope > 2 files OR the step is too vague → notifies you and waits
   │  On success → closes issue, runs sync to test branch
   ▼
 Tester (tab 3)  [test/<name> branch]
