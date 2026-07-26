@@ -82,6 +82,14 @@ One tmux session, one window, four panes arranged in a 2×2 grid:
 | tester        | =test/<name>=     | Writes and runs unit tests for each new feature    |
 | debugger      | =test/<name>=     | Fixes failing tests, iterates with tester          |
 
+There is also a hidden fifth window, =runner= (not part of the 2×2 grid —
+switch to it with tmux's window list, =C-b w=). It's a persistent shell that
+tester/debugger/developer route test and build commands through (via
+=scripts/run_in_watcher.sh=) instead of running them inside their own Claude
+session's Bash tool, so the output is a real live process that streams into
+the Watcher Log as it happens, not something buried invisibly until a whole
+Claude turn finishes. See =scripts/agents/runner.sh=.
+
 * Workflow
 
 #+BEGIN_EXAMPLE
@@ -304,11 +312,13 @@ multiagents-setup/
     ├── notify.sh               # Send an alert to the orchestrator pane
     ├── sync.sh                 # Sync between features/<name> and test/<name>
     ├── quit_workspace.sh       # C-q handler: force-stop all agents + watcher
+    ├── run_in_watcher.sh       # Submit a command to the runner, live in the Watcher Log
     └── agents/
         ├── orchestrator.sh     # Launch orchestrator Claude Code agent
         ├── developer.sh        # Launch developer Claude Code agent
         ├── tester.sh           # Launch tester Claude Code agent
-        └── debugger.sh         # Launch debugger Claude Code agent
+        ├── debugger.sh         # Launch debugger Claude Code agent
+        └── runner.sh           # Persistent shell that executes run_in_watcher.sh commands
 #+END_EXAMPLE
 
 * Requirements
