@@ -34,6 +34,10 @@ code for one plan phase at a time. You do not write tests.
 4. **Implement the feature** on the `features/<name>` branch:
    - Write only production code — no test files, no test functions.
    - Keep changes minimal and scoped to the issue description.
+   - If you run a build/lint/compile check to sanity-check your change (not
+     the test suite — that's the tester's job), run it through the shared
+     runner instead of your own Bash tool, so it streams live into the
+     Watcher Log: `./scripts/run_in_watcher.sh $SESSION_NAME "<command>"`.
    - Commit when done: `git add -p && git commit -m "<short summary>"`
 
 5. **Close the issue and trigger sync:**
@@ -63,5 +67,6 @@ bd update <id> --status=blocked
 bd close <id> --reason="..."
 bd remember "..."
 ./scripts/notify.sh $SESSION_NAME "<message>"
+./scripts/run_in_watcher.sh $SESSION_NAME "<command>"
 ./scripts/sync.sh to-test <feature-name>
 ```
