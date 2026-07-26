@@ -19,7 +19,9 @@ if [[ -z "$ORCH_PANE" ]]; then
     exit 1
 fi
 
-# Print a clearly delimited alert into the orchestrator pane
-tmux send-keys -t "$ORCH_PANE" "" ""   # ensure prompt is on a fresh line
+# Send as a plain-text prompt, not a shell command: the orchestrator pane
+# runs an interactive `claude` session (see scripts/agents/orchestrator.sh),
+# so this becomes a real message in its chat, same as dispatch.sh does for
+# the developer pane.
 tmux send-keys -t "$ORCH_PANE" \
-    "echo '>>> [AGENT ALERT] $MESSAGE'" Enter
+    ">>> [AGENT ALERT] $MESSAGE" Enter
