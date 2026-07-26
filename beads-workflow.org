@@ -8,6 +8,14 @@ and memory to coordinate. Every agent reads from and writes to beads as its
 primary communication channel. Direct inter-pane signalling (tmux) is used
 only for immediate human-visible alerts.
 
+Test and build commands are a separate channel: tester/debugger/developer run
+them via =scripts/run_in_watcher.sh=, which submits the command to a
+persistent shell in the hidden =runner= window instead of the calling agent's
+own Bash tool. This makes the command a real, live process whose output
+streams into the Watcher Log as it happens, while still returning the
+command's real exit code to the calling agent synchronously. See
+=scripts/agents/runner.sh=.
+
 * Issue Types
 
 | Type           | Created by    | Purpose                                              |
