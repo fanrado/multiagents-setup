@@ -11,6 +11,12 @@
 # feature — see scripts/quit_workspace.sh, which fully stops this loop (and
 # the claude child) when the workspace is quit, so there is never orphaned
 # session state to resume from.
+#
+# --disallowed-tools hard-blocks file mutation at the tool level (verified
+# against `claude --help`) — this holds regardless of permission mode, unlike
+# the "never write code" rule in orchestrator.md, which is a written
+# instruction the model could in principle ignore. The orchestrator plans;
+# it never edits.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -26,6 +32,7 @@ echo "[orchestrator] Starting Claude (restart loop)..."
 while true; do
     claude \
         --add-dir "$WORKSPACE_DIR" \
+        --disallowed-tools "Edit,Write,NotebookEdit" \
         --append-system-prompt "$(cat "$INSTRUCTIONS")" || true
 
     echo "[orchestrator] Claude exited. Restarting in 2s..."
