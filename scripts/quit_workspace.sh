@@ -20,10 +20,13 @@ SESSION_NAME="${1:?Usage: quit_workspace.sh <session-name>}"
 # would miss survivors we still need to force-kill.
 # (Built with a while-read loop, not `mapfile`, since macOS ships bash 3.2
 # where `mapfile`/`readarray` don't exist.)
+# `-s` is required: plain `list-panes -t <session>` only lists the *current*
+# window's panes, not every window in the session — the hidden "runner"
+# window (scripts/agents/runner.sh) would otherwise survive C-q entirely.
 PANE_PIDS=()
 while IFS= read -r pid; do
     [[ -n "$pid" ]] && PANE_PIDS+=("$pid")
-done < <(tmux list-panes -t "$SESSION_NAME" -F "#{pane_pid}" 2>/dev/null)
+done < <(tmux list-panes -s -t "$SESSION_NAME" -F "#{pane_pid}" 2>/dev/null)
 
 STATE_DIR="${TMPDIR:-/tmp}/multiagents-${SESSION_NAME}"
 WATCHER_PID=""
