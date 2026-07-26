@@ -237,13 +237,21 @@ branch, and trigger the rest of the pipeline automatically.
 
 * Keybindings
 
-| Key     | Action                             |
-|---------+------------------------------------|
-| =C-q=   | Kill the session and all its panes |
-| =C-b d= | Detach from the session            |
+| Key     | Action                                                       |
+|---------+---------------------------------------------------------------|
+| =C-q=   | Stop every agent process and the watcher, then kill the session |
+| =C-b d= | Detach from the session (agents keep running)                |
 
 Standard tmux navigation (=C-b= prefix) works as usual for switching panes,
 resizing, scrolling, etc.
+
+=C-q= runs =scripts/quit_workspace.sh=, which force-stops each pane's restart
+loop and its =claude= child (not just the tmux pane) before killing the
+session. None of the launch scripts ever pass =--continue= or =--resume=, so
+quitting never leaves a Claude session to resume from — reattaching to a
+workspace is =workspace --attach= (tmux session persistence), not a Claude
+resume prompt. Detaching with =C-b d= is different: it leaves everything
+running in the background — see "Detaching and Reattaching" below.
 
 * Detaching and Reattaching
 
@@ -288,6 +296,7 @@ multiagents-setup/
     ├── dispatch.sh             # Dispatch a plan-phase issue to the developer
     ├── notify.sh               # Send an alert to the orchestrator pane
     ├── sync.sh                 # Sync between features/<name> and test/<name>
+    ├── quit_workspace.sh       # C-q handler: force-stop all agents + watcher
     └── agents/
         ├── orchestrator.sh     # Launch orchestrator Claude Code agent
         ├── developer.sh        # Launch developer Claude Code agent
