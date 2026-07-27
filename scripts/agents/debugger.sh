@@ -6,6 +6,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 source "$WORKSPACE_ROOT/config/workspace.conf"
 
+# claude runs with cwd = WORKSPACE_DIR (the project), not this repo, so
+# agents/debugger.md references scripts via "$MULTIAGENTS_ROOT/scripts/..."
+# instead of a relative "./scripts/..." that would resolve against the
+# project dir and fail. Export it so Bash-tool subprocesses see it.
+export MULTIAGENTS_ROOT="$WORKSPACE_ROOT"
+
 bd() { (cd "$WORKSPACE_DIR" && command bd "$@"); }
 
 INSTRUCTIONS="$WORKSPACE_ROOT/agents/debugger.md"
