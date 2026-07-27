@@ -14,9 +14,20 @@ INSTRUCTIONS="$WORKSPACE_ROOT/agents/developer.md"
 echo "[developer] WORKSPACE_ROOT : $WORKSPACE_ROOT"
 echo "[developer] WORKSPACE_DIR  : $WORKSPACE_DIR"
 
-POLL_PROMPT="No open issues right now. Run 'bd ready' every 30 seconds. As soon as an issue appears, read it with 'bd show <id>', implement the feature in $WORKSPACE_DIR, commit your changes, then close it with 'bd close <id>'. Keep looping."
+# Idle refresh used to depend on `claude ... "$PROMPT"` exiting after each turn
+# so the outer restart loop below could relaunch it and re-check bd ready.
+# Claude Code now stays interactive by default (no auto-exit), so that restart
+# loop never fires again once a turn ends — the pane would go silent forever
+# after finishing a task instead of continuing to poll. Instead, hand the idle
+# model one literal, bounded, self-contained bash loop to run via its own Bash
+# tool: it blocks and re-polls internally, and the prompt tells the model to
+# just re-run it if it comes back empty, so refreshing no longer depends on
+# the wrapper script ever seeing `claude` exit.
+POLL_CMD='i=0; while [[ $i -lt 15 ]]; do out=$(bd ready --json 2>/dev/null); if [[ $out != "[]" ]]; then bd ready; break; fi; i=$((i+1)); echo "[developer] No open issues. Waiting, refresh in 30s... ($i/15)"; sleep 30; done'
 
-WORK_PROMPT="Start your work session: run 'bd ready' to find open issues (skip any titled 'test report'). For each open issue, read it with 'bd show <id>', implement the feature in $WORKSPACE_DIR, commit your changes, then close the issue with 'bd close <id>'. After each issue, immediately check 'bd ready' again and continue. Keep going until there is nothing left to do, then run 'bd ready' every 30 seconds and wait."
+POLL_PROMPT="No open issues right now. Run this exact command via your Bash tool with a 600000ms timeout and let it run to completion (it blocks itself, polling every 30 seconds): '$POLL_CMD'. If it exits after printing an issue list, read each with 'bd show <id>', implement the feature in $WORKSPACE_DIR, commit your changes, then close it with 'bd close <id>', and immediately run 'bd ready' again for more work. If it exits after 15 waiting cycles with nothing found, run the exact same command again right away. Keep repeating — never leave the loop unattended."
+
+WORK_PROMPT="Start your work session: run 'bd ready' to find open issues (skip any titled 'test report'). For each open issue, read it with 'bd show <id>', implement the feature in $WORKSPACE_DIR, commit your changes, then close the issue with 'bd close <id>'. After each issue, immediately check 'bd ready' again and continue. Keep going until there is nothing left to do, then run this exact command via your Bash tool with a 600000ms timeout and let it run to completion: '$POLL_CMD'. If it exits after printing an issue list, go back to implementing. If it exits after 15 waiting cycles with nothing found, run the exact same command again right away."
 
 NO_BEADS_PROMPT="No beads issue tracker is available. Explore $WORKSPACE_DIR, understand the codebase, and wait for direct instructions."
 
