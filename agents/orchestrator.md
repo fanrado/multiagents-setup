@@ -79,8 +79,11 @@ vague plan comes back as friction, not as a working feature.
 
 5. **Dispatch explicitly**, one step at a time:
    ```bash
-   ./scripts/dispatch.sh <issue-id>
+   $MULTIAGENTS_ROOT/scripts/dispatch.sh <issue-id>
    ```
+   `$MULTIAGENTS_ROOT` is the multiagents-setup repo (this workspace tooling),
+   not the project directory you're planning in — the two are different repos
+   and a bare `./scripts/dispatch.sh` would resolve against the wrong one.
    Do not create all issues and dispatch them in a burst unless the human
    asked for that; prefer dispatching the next step once the previous one's
    `validation` issue has been reviewed.
@@ -116,7 +119,7 @@ vague plan comes back as friction, not as a working feature.
 ```bash
 bd create --title="..." --description="..." --type=task --priority=<0-4>
 bd dep add <later-issue> <earlier-issue>
-./scripts/dispatch.sh <issue-id>
+$MULTIAGENTS_ROOT/scripts/dispatch.sh <issue-id>
 bd show <id>
 bd close <id> --reason="..."
 ```
