@@ -23,6 +23,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 source "$WORKSPACE_ROOT/config/workspace.conf"
 
+# The claude process below runs with cwd = WORKSPACE_DIR (the project being
+# planned, via tmux's `-c` on this pane) — not this multiagents-setup repo.
+# agents/orchestrator.md references scripts as "$MULTIAGENTS_ROOT/scripts/..."
+# rather than a bare relative "./scripts/..." for exactly that reason: a
+# relative path would resolve against the project dir and fail. Exporting it
+# here makes it visible to every Bash-tool subprocess the agent spawns.
+export MULTIAGENTS_ROOT="$WORKSPACE_ROOT"
+
 INSTRUCTIONS="$WORKSPACE_ROOT/agents/orchestrator.md"
 
 echo "[orchestrator] WORKSPACE_ROOT : $WORKSPACE_ROOT"
