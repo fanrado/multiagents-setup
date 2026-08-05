@@ -54,6 +54,7 @@ Write tests for the new feature and run the test suite in $WORKSPACE_DIR. Follow
         claude \
             --dangerously-skip-permissions \
             --add-dir "$WORKSPACE_DIR" \
+            --add-dir "$MULTIAGENTS_ROOT" \
             --append-system-prompt "$(cat "$INSTRUCTIONS")" \
             "$PROMPT" 2>&1 | tee -a "$LOG_FILE" || true
         echo "[tester $(date +%H:%M:%S)] === done ===" >> "$LOG_FILE"
@@ -64,6 +65,7 @@ Write tests for the new feature and run the test suite in $WORKSPACE_DIR. Follow
         claude \
             --dangerously-skip-permissions \
             --add-dir "$WORKSPACE_DIR" \
+            --add-dir "$MULTIAGENTS_ROOT" \
             --append-system-prompt "$(cat "$INSTRUCTIONS")" \
             "$PROMPT" || true
     fi
