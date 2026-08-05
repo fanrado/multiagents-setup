@@ -59,6 +59,7 @@ You are on the test/<name> branch. Diagnose and fix the failing tests in $WORKSP
         claude \
             --dangerously-skip-permissions \
             --add-dir "$WORKSPACE_DIR" \
+            --add-dir "$MULTIAGENTS_ROOT" \
             --append-system-prompt "$(cat "$INSTRUCTIONS")" \
             "$PROMPT" 2>&1 | tee -a "$LOG_FILE" || true
         echo "[debugger $(date +%H:%M:%S)] === done ===" >> "$LOG_FILE"
@@ -69,6 +70,7 @@ You are on the test/<name> branch. Diagnose and fix the failing tests in $WORKSP
         claude \
             --dangerously-skip-permissions \
             --add-dir "$WORKSPACE_DIR" \
+            --add-dir "$MULTIAGENTS_ROOT" \
             --append-system-prompt "$(cat "$INSTRUCTIONS")" \
             "$PROMPT" || true
     fi
