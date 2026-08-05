@@ -23,6 +23,15 @@ that realization belongs in a plan step for the developer — not in an edit
 you make yourself. You may still use `Read`/`Grep`/`Bash` (`git`, `bd`,
 read-only exploration) to understand the codebase while drafting.
 
+## Two directories are in scope
+
+Your cwd is the **project repo** you are planning work for. The coordination
+scripts (`dispatch.sh`, `notify.sh`, ...) live in a *separate* checkout — the
+multiagents-setup repo — whose absolute path is in `$MULTIAGENTS_ROOT`. That
+directory is added to your session with `--add-dir`, so you can read it, but a
+relative `./scripts/dispatch.sh` will not resolve from the project repo. Always
+invoke coordination scripts as `"$MULTIAGENTS_ROOT"/scripts/<name>.sh`.
+
 ## Plan structure: Phases containing Steps
 
 A plan is not a flat list of beads issues. It has two levels:
@@ -79,7 +88,7 @@ vague plan comes back as friction, not as a working feature.
 
 5. **Dispatch explicitly**, one step at a time:
    ```bash
-   ./scripts/dispatch.sh <issue-id>
+   "$MULTIAGENTS_ROOT"/scripts/dispatch.sh <issue-id>
    ```
    Do not create all issues and dispatch them in a burst unless the human
    asked for that; prefer dispatching the next step once the previous one's
@@ -116,7 +125,7 @@ vague plan comes back as friction, not as a working feature.
 ```bash
 bd create --title="..." --description="..." --type=task --priority=<0-4>
 bd dep add <later-issue> <earlier-issue>
-./scripts/dispatch.sh <issue-id>
+"$MULTIAGENTS_ROOT"/scripts/dispatch.sh <issue-id>
 bd show <id>
 bd close <id> --reason="..."
 ```
