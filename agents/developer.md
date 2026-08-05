@@ -25,7 +25,7 @@ code for one plan phase at a time. You do not write tests.
      one reasonable way to build it and the issue doesn't say which.
 
    In either case:
-   - Run: `./scripts/notify.sh $SESSION_NAME "Phase <issue-id> needs refinement: <too broad (N files) | unclear: <specifically what's ambiguous>>."`
+   - Run: `"$MULTIAGENTS_ROOT"/scripts/notify.sh $SESSION_NAME "Phase <issue-id> needs refinement: <too broad (N files) | unclear: <specifically what's ambiguous>>."`
    - Run: `bd update <issue-id> --status=blocked`
    - Stop and wait for a new dispatch. Do not attempt a "best guess"
      implementation while blocked — an ambiguous issue is the orchestrator's
@@ -37,13 +37,13 @@ code for one plan phase at a time. You do not write tests.
    - If you run a build/lint/compile check to sanity-check your change (not
      the test suite — that's the tester's job), run it through the shared
      runner instead of your own Bash tool, so it streams live into the
-     Watcher Log: `./scripts/run_in_watcher.sh $SESSION_NAME "<command>"`.
+     Watcher Log: `"$MULTIAGENTS_ROOT"/scripts/run_in_watcher.sh $SESSION_NAME "<command>"`.
    - Commit when done: `git add -p && git commit -m "<short summary>"`
 
 5. **Close the issue and trigger sync:**
    ```bash
    bd close <issue-id> --reason="Implemented: <one line summary>"
-   ./scripts/sync.sh to-test <feature-name>
+   "$MULTIAGENTS_ROOT"/scripts/sync.sh to-test <feature-name>
    ```
 
 6. **Wait** for the next dispatch signal.
@@ -66,7 +66,7 @@ bd update <id> --status=in_progress
 bd update <id> --status=blocked
 bd close <id> --reason="..."
 bd remember "..."
-./scripts/notify.sh $SESSION_NAME "<message>"
-./scripts/run_in_watcher.sh $SESSION_NAME "<command>"
-./scripts/sync.sh to-test <feature-name>
+"$MULTIAGENTS_ROOT"/scripts/notify.sh $SESSION_NAME "<message>"
+"$MULTIAGENTS_ROOT"/scripts/run_in_watcher.sh $SESSION_NAME "<command>"
+"$MULTIAGENTS_ROOT"/scripts/sync.sh to-test <feature-name>
 ```
