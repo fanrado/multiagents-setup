@@ -32,6 +32,7 @@ echo "[orchestrator] Starting Claude (restart loop)..."
 while true; do
     claude \
         --add-dir "$WORKSPACE_DIR" \
+        --add-dir "$MULTIAGENTS_ROOT" \
         --disallowed-tools "Edit,Write,NotebookEdit" \
         --append-system-prompt "$(cat "$INSTRUCTIONS")" || true
 
