@@ -98,7 +98,7 @@ You (orchestrator, tab 1)
   │     (no beads issues yet — you cannot edit files, only plan)
   │  2. Once you explicitly approve the full plan, one plan-phase
   │     beads issue is created per step (≤ 2 files, 1 ideal)
-  │  3. Run: ./scripts/dispatch.sh <issue-id>
+  │  3. Run: "$MULTIAGENTS_ROOT"/scripts/dispatch.sh <issue-id>
   ▼
 Developer (tab 2)  [features/<name> branch]
   │  Reads the issue, implements the feature, commits

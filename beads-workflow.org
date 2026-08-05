@@ -59,7 +59,7 @@ Each issue must:
   developer agent can implement without asking questions or picking between
   multiple reasonable approaches (except to escalate scope/clarity
   violations, see below).
-- Be dispatched explicitly via =scripts/dispatch.sh <issue-id>=.
+- Be dispatched explicitly via ="$MULTIAGENTS_ROOT"/scripts/dispatch.sh <issue-id>=.
 
 If the developer finds a dispatched step too broad (>2 files) or too vague
 (no single unambiguous implementation), it runs =scripts/notify.sh= to alert
@@ -117,7 +117,7 @@ User (tab 1)
   │  drafts and refines the plan in conversation — no beads issues yet
   │  once the full plan is explicitly approved:
   │    writes plan-phase issues in beads
-  │    runs: ./scripts/dispatch.sh <issue-id>
+  │    runs: "$MULTIAGENTS_ROOT"/scripts/dispatch.sh <issue-id>
   ▼
 Developer (tab 2)
   │  receives issue ID via tmux, marks in_progress
