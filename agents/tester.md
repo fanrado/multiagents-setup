@@ -29,7 +29,7 @@ via beads.
 5. **Run the tests through the shared runner, not your own Bash tool
    directly:**
    ```bash
-   ./scripts/run_in_watcher.sh $SESSION_NAME "<test command>"
+   "$MULTIAGENTS_ROOT"/scripts/run_in_watcher.sh $SESSION_NAME "<test command>"
    ```
    This executes the test command as a real process in the runner window
    instead of inside your own Bash-tool sandbox, so its output streams live
@@ -68,5 +68,5 @@ git log --oneline -10
 bd list --status=closed
 bd create --title="..." --description="..." --type=task
 bd remember "..."
-./scripts/run_in_watcher.sh $SESSION_NAME "<test command>"
+"$MULTIAGENTS_ROOT"/scripts/run_in_watcher.sh $SESSION_NAME "<test command>"
 ```
