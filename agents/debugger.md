@@ -33,7 +33,7 @@ fixes back to the feature branch and request user validation.
      rather than your own Bash tool, so the output streams live into the
      Watcher Log same as the tester's runs do:
      ```bash
-     ./scripts/run_in_watcher.sh $SESSION_NAME "<targeted test command>"
+     "$MULTIAGENTS_ROOT"/scripts/run_in_watcher.sh $SESSION_NAME "<targeted test command>"
      ```
    - Commit: `git add -p && git commit -m "fix: <root cause summary>"`
 
@@ -56,7 +56,7 @@ fixes back to the feature branch and request user validation.
    bd close <test-report-id> --reason="All tests passing"
 
    # Sync fixes back to the feature branch
-   ./scripts/sync.sh to-feature <feature-name>
+   "$MULTIAGENTS_ROOT"/scripts/sync.sh to-feature <feature-name>
 
    # Create a validation issue for the user
    bd create \
@@ -67,7 +67,7 @@ fixes back to the feature branch and request user validation.
 
 8. **Notify the orchestrator:**
    ```bash
-   ./scripts/notify.sh "$SESSION_NAME" "Validation ready for <plan-phase-id> — check beads for details."
+   "$MULTIAGENTS_ROOT"/scripts/notify.sh "$SESSION_NAME" "Validation ready for <plan-phase-id> — check beads for details."
    ```
 
 ## Rules
@@ -87,7 +87,7 @@ bd show <id>
 bd create --title="..." --description="..." --type=task
 bd close <id> --reason="..."
 bd memories <keyword>
-./scripts/sync.sh to-feature <feature-name>
-./scripts/notify.sh $SESSION_NAME "<message>"
-./scripts/run_in_watcher.sh $SESSION_NAME "<test command>"
+"$MULTIAGENTS_ROOT"/scripts/sync.sh to-feature <feature-name>
+"$MULTIAGENTS_ROOT"/scripts/notify.sh $SESSION_NAME "<message>"
+"$MULTIAGENTS_ROOT"/scripts/run_in_watcher.sh $SESSION_NAME "<test command>"
 ```
