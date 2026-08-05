@@ -51,6 +51,7 @@ while true; do
     claude \
         --dangerously-skip-permissions \
         --add-dir "$WORKSPACE_DIR" \
+        --add-dir "$MULTIAGENTS_ROOT" \
         --append-system-prompt "$(cat "$INSTRUCTIONS")" \
         "$PROMPT" || true
 
