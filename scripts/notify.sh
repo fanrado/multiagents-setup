@@ -9,10 +9,11 @@ MESSAGE="${2:?Usage: notify.sh <session> <message>}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../config/workspace.conf
 source "$SCRIPT_DIR/../config/workspace.conf"
+# shellcheck source=./tmux_helpers.sh
+source "$SCRIPT_DIR/tmux_helpers.sh"
 
-# Locate the orchestrator pane by title
-ORCH_PANE=$(tmux list-panes -t "$SESSION" -F "#{pane_id} #{pane_title}" \
-    | awk -v title="$PANE_ORCHESTRATOR" '$2 == title { print $1; exit }')
+# Locate the orchestrator pane by its @role stamp (titles are not stable)
+ORCH_PANE=$(tmux_find_pane_by_role "$SESSION" "$PANE_ORCHESTRATOR")
 
 if [[ -z "$ORCH_PANE" ]]; then
     echo "notify.sh: orchestrator pane not found in session '$SESSION'" >&2
