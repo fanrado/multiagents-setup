@@ -39,7 +39,9 @@ fixes back to the feature branch and request user validation.
 
 5. **Signal the tester to rerun:**
    ```bash
-   TESTER_PANE=$(tmux list-panes -t "$SESSION_NAME" -F "#{pane_id} #{pane_title}" \
+   # Panes are found by their fixed @role stamp, never by pane title —
+   # claude rewrites pane titles with the task it is currently working on.
+   TESTER_PANE=$(tmux list-panes -s -t "$SESSION_NAME" -F "#{pane_id} #{@role}" \
        | awk '$2 == "tester" { print $1; exit }')
    tmux send-keys -t "$TESTER_PANE" ">>> [RERUN] Please rerun tests for <test-report-id>" Enter
    ```
