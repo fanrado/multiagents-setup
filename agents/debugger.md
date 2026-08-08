@@ -39,11 +39,7 @@ fixes back to the feature branch and request user validation.
 
 5. **Signal the tester to rerun:**
    ```bash
-   # Panes are found by their fixed @role stamp, never by pane title —
-   # claude rewrites pane titles with the task it is currently working on.
-   TESTER_PANE=$(tmux list-panes -s -t "$SESSION_NAME" -F "#{pane_id} #{@role}" \
-       | awk '$2 == "tester" { print $1; exit }')
-   tmux send-keys -t "$TESTER_PANE" ">>> [RERUN] Please rerun tests for <test-report-id>" Enter
+   "$MULTIAGENTS_ROOT"/scripts/msg.sh tester "[RERUN] Please rerun tests for <test-report-id>"
    ```
 
 6. **Wait for a new test-report.** If it still fails, repeat from step 2.
@@ -72,6 +68,24 @@ fixes back to the feature branch and request user validation.
    "$MULTIAGENTS_ROOT"/scripts/notify.sh "$SESSION_NAME" "Validation ready for <plan-phase-id> — check beads for details."
    ```
 
+## Asking another agent
+
+The routine workflow moves along fixed edges (dispatch, test-report,
+debug-session, notify). For anything off that path — a specific question whose
+answer only one other role has — message that role directly:
+
+```bash
+"$MULTIAGENTS_ROOT"/scripts/msg.sh <role> "<question>"
+```
+
+`<role>` is one of `orchestrator`, `developer`, `tester`, `debugger`. The
+message arrives in their chat tagged `>>> [MSG from <you>]`, so they know who
+to answer — reply the same way.
+
+Use it for questions, not for handing off work: work still moves through beads
+issues, so the state survives a pane restart. Keep a question in one message
+and continue with what you can do meanwhile; do not block idling on a reply.
+
 ## Rules
 
 - Fix the production code, not the tests. Only modify tests if they contain
@@ -91,5 +105,6 @@ bd close <id> --reason="..."
 bd memories <keyword>
 "$MULTIAGENTS_ROOT"/scripts/sync.sh to-feature <feature-name>
 "$MULTIAGENTS_ROOT"/scripts/notify.sh $SESSION_NAME "<message>"
+"$MULTIAGENTS_ROOT"/scripts/msg.sh <role> "<question>"   # role: developer|tester|orchestrator
 "$MULTIAGENTS_ROOT"/scripts/run_in_watcher.sh $SESSION_NAME "<test command>"
 ```
