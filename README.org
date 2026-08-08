@@ -250,6 +250,26 @@ from the orchestrator pane (tab 1):
 The developer agent will see the issue, implement it on the =features/<name>=
 branch, and trigger the rest of the pipeline automatically.
 
+** Messaging an agent directly
+
+=dispatch.sh= and =notify.sh= cover the two fixed edges of the routine
+pipeline. Everything else — one agent asking another a specific, off-script
+question, or you poking a single pane from a shell — goes through =msg.sh=:
+
+#+BEGIN_SRC sh
+~/multiagents-setup/scripts/msg.sh <role> "<message>"
+# example:
+~/multiagents-setup/scripts/msg.sh tester "Which fixture does test_auth_flow use?"
+#+END_SRC
+
+=<role>= is =orchestrator=, =developer=, =tester=, or =debugger=. The recipient
+pane is resolved by its =@role= stamp, and the message arrives tagged
+=>>> [MSG from <sender>]= — the sender being the role of the pane the script
+was called from, or =user= when called from a plain terminal.
+
+Messages carry questions; work still moves through beads issues, so pipeline
+state survives a pane restart.
+
 * Keybindings
 
 | Key     | Action                                                       |
@@ -310,6 +330,7 @@ multiagents-setup/
     ├── tmux_helpers.sh         # Shared tmux functions (split, title, send)
     ├── dispatch.sh             # Dispatch a plan-phase issue to the developer
     ├── notify.sh               # Send an alert to the orchestrator pane
+    ├── msg.sh                  # Send a free-form message to any agent by role
     ├── sync.sh                 # Sync between features/<name> and test/<name>
     ├── quit_workspace.sh       # C-q handler: force-stop all agents + watcher
     ├── run_in_watcher.sh       # Submit a command to the runner, live in the Watcher Log
