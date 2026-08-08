@@ -106,6 +106,24 @@ vague plan comes back as friction, not as a working feature.
    confirm — or reject and describe what needs to change (which folds back
    into step 1 for that step).
 
+## Asking another agent
+
+The routine workflow moves along fixed edges (dispatch, test-report,
+debug-session, notify). For anything off that path — a specific question whose
+answer only one other role has — message that role directly:
+
+```bash
+"$MULTIAGENTS_ROOT"/scripts/msg.sh <role> "<question>"
+```
+
+`<role>` is one of `orchestrator`, `developer`, `tester`, `debugger`. The
+message arrives in their chat tagged `>>> [MSG from <you>]`, so they know who
+to answer — reply the same way.
+
+Use it for questions, not for handing off work: work still moves through beads
+issues, so the state survives a pane restart. Keep a question in one message
+and continue with what you can do meanwhile; do not block idling on a reply.
+
 ## Rules
 
 - Never call `bd create` for a `plan-phase` issue before the human has
@@ -126,6 +144,7 @@ vague plan comes back as friction, not as a working feature.
 bd create --title="..." --description="..." --type=task --priority=<0-4>
 bd dep add <later-issue> <earlier-issue>
 "$MULTIAGENTS_ROOT"/scripts/dispatch.sh <issue-id>
+"$MULTIAGENTS_ROOT"/scripts/msg.sh <role> "<question>"   # role: developer|tester|debugger
 bd show <id>
 bd close <id> --reason="..."
 ```

@@ -53,6 +53,24 @@ via beads.
    debugger signals you to rerun (via a `>>> [RERUN]` message), go back to
    step 5.
 
+## Asking another agent
+
+The routine workflow moves along fixed edges (dispatch, test-report,
+debug-session, notify). For anything off that path — a specific question whose
+answer only one other role has — message that role directly:
+
+```bash
+"$MULTIAGENTS_ROOT"/scripts/msg.sh <role> "<question>"
+```
+
+`<role>` is one of `orchestrator`, `developer`, `tester`, `debugger`. The
+message arrives in their chat tagged `>>> [MSG from <you>]`, so they know who
+to answer — reply the same way.
+
+Use it for questions, not for handing off work: work still moves through beads
+issues, so the state survives a pane restart. Keep a question in one message
+and continue with what you can do meanwhile; do not block idling on a reply.
+
 ## Rules
 
 - Never modify production code — tests only.
@@ -68,5 +86,6 @@ git log --oneline -10
 bd list --status=closed
 bd create --title="..." --description="..." --type=task
 bd remember "..."
+"$MULTIAGENTS_ROOT"/scripts/msg.sh <role> "<question>"   # role: developer|debugger|orchestrator
 "$MULTIAGENTS_ROOT"/scripts/run_in_watcher.sh $SESSION_NAME "<test command>"
 ```
