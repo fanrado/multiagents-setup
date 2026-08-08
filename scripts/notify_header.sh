@@ -9,14 +9,17 @@ MESSAGE="${2:?Usage: notify_header.sh <session> <message>}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../config/workspace.conf"
+# shellcheck source=./tmux_helpers.sh
+source "$SCRIPT_DIR/tmux_helpers.sh"
 
-ORCH_PANE=$(tmux list-panes -t "$SESSION" -F "#{pane_id} #{pane_title}" 2>/dev/null \
-    | awk -v t="$PANE_ORCHESTRATOR" '$2 == t { print $1; exit }')
+ORCH_PANE=$(tmux_find_pane_by_role "$SESSION" "$PANE_ORCHESTRATOR")
 
 [[ -z "$ORCH_PANE" ]] && exit 0
 
-# Update pane border title
-tmux select-pane -t "$ORCH_PANE" -T "$MESSAGE"
+# Publish the status as @status, which pane-border-format appends after the
+# role name. Overwriting the pane title instead would erase the "orchestrator"
+# label and used to break every title-based pane lookup.
+tmux set-option -p -t "$ORCH_PANE" @status "$MESSAGE"
 
 # Show a 4-second auto-dismissing popup (tmux >= 3.2)
 tmux display-popup \
