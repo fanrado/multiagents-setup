@@ -128,12 +128,15 @@ LOGS_BTN=$(tmux split-window -v -f -l 2 -t "${SESSION_NAME}:${WINDOW_NAME}" \
 # Show pane titles in the border header of each pane
 tmux set-option -t "$SESSION_NAME" pane-border-status top
 
-# Label each pane
-tmux_pane_title "$TL" "$PANE_ORCHESTRATOR"
-tmux_pane_title "$TR" "$PANE_DEVELOPER"
-tmux_pane_title "$BL" "$PANE_TESTER"
-tmux_pane_title "$BR" "$PANE_DEBUGGER"
-tmux_pane_title "$LOGS_BTN" "logs"
+# Label each pane and stamp its permanent role. Scripts look panes up by
+# @role, never by title: claude rewrites the pane title with the task it is
+# working on, which used to make dispatch.sh & co. lose the developer pane.
+tmux_pane_role "$TL" "$PANE_ORCHESTRATOR"
+tmux_pane_role "$TR" "$PANE_DEVELOPER"
+tmux_pane_role "$BL" "$PANE_TESTER"
+tmux_pane_role "$BR" "$PANE_DEBUGGER"
+tmux_pane_role "$LOGS_BTN" "logs"
+
 
 # Apply unified color theme
 tmux_apply_theme "$SESSION_NAME"
@@ -155,6 +158,18 @@ tmux set-hook -t "$SESSION_NAME" client-resized \
 # inside an individual agent's own Bash-tool sandbox. Not part of the visible
 # 2x2 grid; switch to it with tmux's window list (C-b w) to watch it directly.
 tmux new-window -d -n runner -t "$SESSION_NAME" -c "$WORKSPACE_DIR"
+tmux_pane_role "$(tmux_pane_id "${SESSION_NAME}:runner")" "runner"
+
+# Belt and braces: freeze the names the panes and windows already have.
+# allow-set-title (tmux >= 3.4) blocks OSC 0/2 pane-title rewrites outright;
+# allow-rename blocks OSC window renames. Both are silently skipped on older
+# tmux, where the @role lookups above are what actually guarantee correctness.
+for _w in $(tmux list-windows -t "$SESSION_NAME" -F "#{window_id}"); do
+    tmux set-option -w -t "$_w" allow-set-title off 2>/dev/null || true
+    tmux set-option -w -t "$_w" allow-rename off 2>/dev/null || true
+    tmux set-option -w -t "$_w" automatic-rename off 2>/dev/null || true
+done
+unset _w
 
 # Left-click on the logs pane → open popup; anywhere else → normal pane select
 tmux bind-key -T root MouseDown1Pane \
