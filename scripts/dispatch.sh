@@ -9,6 +9,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../config/workspace.conf
 source "$SCRIPT_DIR/../config/workspace.conf"
+# shellcheck source=./tmux_helpers.sh
+source "$SCRIPT_DIR/tmux_helpers.sh"
 
 # Run bd against the project repo (WORKSPACE_DIR), not dispatch.sh's ambient cwd,
 # which may differ when the workspace was started with -d/--dir.
@@ -34,9 +36,9 @@ case "${1:-}" in
         ;;
 esac
 
-# Locate the developer pane by title
-DEV_PANE=$(tmux list-panes -t "$SESSION" -F "#{pane_id} #{pane_title}" \
-    | awk -v title="$PANE_DEVELOPER" '$2 == title { print $1; exit }')
+# Locate the developer pane by its @role stamp — the pane title is not stable,
+# claude rewrites it with whatever task it is currently working on.
+DEV_PANE=$(tmux_find_pane_by_role "$SESSION" "$PANE_DEVELOPER")
 
 if [[ -z "$DEV_PANE" ]]; then
     echo "dispatch.sh: developer pane not found in session '$SESSION'." >&2
