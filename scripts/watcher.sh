@@ -49,8 +49,9 @@ exec >> "$LOG_FILE" 2>&1
 
 log() { echo "[watcher $(date +%H:%M:%S)] $*"; }
 
+# Look panes up by their @role stamp; pane titles get rewritten by claude.
 _pane() {
-    tmux list-panes -t "$SESSION_NAME" -F "#{pane_id} #{pane_title}" 2>/dev/null \
+    tmux list-panes -s -t "$SESSION_NAME" -F "#{pane_id} #{@role}" 2>/dev/null \
         | awk -v t="$1" '$2 == t { print $1; exit }'
 }
 
