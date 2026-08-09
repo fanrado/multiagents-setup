@@ -49,26 +49,25 @@ Write tests for the new feature and run the test suite in $WORKSPACE_DIR. Follow
         work=false
     fi
 
-    # Never pipe claude into `tee`: that hands it a non-TTY stdout, so the
-    # interactive session exits immediately instead of waiting for the user,
-    # and this loop spins — restarting every 15s and firing a notification
-    # each time. Test output already reaches the Watcher Log through
-    # scripts/run_in_watcher.sh; only the session markers are logged here.
-    [[ "$work" == true ]] && \
-        echo "[tester $(date +%H:%M:%S)] === test run: $short ===" >> "$LOG_FILE"
-
-    claude \
-        --dangerously-skip-permissions \
-        --add-dir "$WORKSPACE_DIR" \
-        --add-dir "$MULTIAGENTS_ROOT" \
-        --append-system-prompt "$(cat "$INSTRUCTIONS")" \
-        "$PROMPT" || true
-
     if $work; then
+        echo "[tester $(date +%H:%M:%S)] === test run: $short ===" >> "$LOG_FILE"
+        claude \
+            --dangerously-skip-permissions \
+            --add-dir "$WORKSPACE_DIR" \
+            --add-dir "$MULTIAGENTS_ROOT" \
+            --append-system-prompt "$(cat "$INSTRUCTIONS")" \
+            "$PROMPT" 2>&1 | tee -a "$LOG_FILE" || true
         echo "[tester $(date +%H:%M:%S)] === done ===" >> "$LOG_FILE"
         ts=$(date +%H:%M)
         "$SCRIPT_DIR/../../scripts/notify_header.sh" "$SESSION_NAME" \
             "[tester] Tests done: $short ($ts)" 2>/dev/null || true
+    else
+        claude \
+            --dangerously-skip-permissions \
+            --add-dir "$WORKSPACE_DIR" \
+            --add-dir "$MULTIAGENTS_ROOT" \
+            --append-system-prompt "$(cat "$INSTRUCTIONS")" \
+            "$PROMPT" || true
     fi
 
     echo "[tester] Claude exited. Restarting in 15s..."

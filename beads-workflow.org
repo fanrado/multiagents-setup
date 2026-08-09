@@ -104,7 +104,6 @@ prefixes so entries are searchable:
 | Prefix          | Example key                  | What to store                              |
 |-----------------+------------------------------+--------------------------------------------|
 | =perm:=         | =perm:read:/etc/hosts=       | Granted external file-read authorizations  |
-| =branch:=       | =branch:current=auth-refactor= | Active feature name for this workspace   |
 | =agent:=        | =agent:developer:last-phase= | Last issue ID processed by an agent        |
 | =pattern:=      | =pattern:test-runner=        | How to run tests in this project           |
 
@@ -121,20 +120,19 @@ User (tab 1)
   ▼
 Developer (tab 2)
   │  receives issue ID via tmux, marks in_progress
-  │  implements feature on features/<name> branch
+  │  implements feature on the current branch
   │  if scope > 2 files OR the step is too vague to implement without
   │    guessing: scripts/notify.sh → tab 1, marks blocked
-  │  on success: closes plan-phase, runs scripts/sync.sh to-test <name>
+  │  on success: closes plan-phase
   ▼
-Tester (tab 3)                         [on test/<name> branch]
-  │  detects new commits from sync
+Tester (tab 3)
+  │  detects the new commit
   │  writes + runs unit tests
   │  creates test-report issue (pass or fail)
   ▼
-Debugger (tab 4)                       [on test/<name> branch]
+Debugger (tab 4)
   │  if fail: reads test-report, fixes code, signals tester to rerun
   │  iterates until all tests pass
-  │  runs scripts/sync.sh to-feature <name>
   │  creates validation issue
   ▼
 User (tab 1)

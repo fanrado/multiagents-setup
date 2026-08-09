@@ -45,7 +45,7 @@ while true; do
 
 $details
 
-You are on the test/<name> branch. Diagnose and fix the failing tests in $WORKSPACE_DIR following your instructions. Do not touch production code unless it contains a clear bug."
+Diagnose and fix the failing tests in $WORKSPACE_DIR following your instructions. Do not touch production code unless it contains a clear bug."
         echo "[debugger] Test report found: $report — starting Claude..."
         work=true
     else
@@ -54,25 +54,26 @@ You are on the test/<name> branch. Diagnose and fix the failing tests in $WORKSP
         work=false
     fi
 
-    if $work; then
+    # Never pipe claude into `tee`: that hands it a non-TTY stdout, so the
+    # interactive session exits immediately instead of waiting for the user,
+    # and this loop spins — restarting every 15s and firing a notification
+    # each time. Test output already reaches the Watcher Log through
+    # scripts/run_in_watcher.sh; only the session markers are logged here.
+    [[ "$work" == true ]] && \
         echo "[debugger $(date +%H:%M:%S)] === debug session: $report ===" >> "$LOG_FILE"
-        claude \
-            --dangerously-skip-permissions \
-            --add-dir "$WORKSPACE_DIR" \
-            --add-dir "$MULTIAGENTS_ROOT" \
-            --append-system-prompt "$(cat "$INSTRUCTIONS")" \
-            "$PROMPT" 2>&1 | tee -a "$LOG_FILE" || true
+
+    claude \
+        --dangerously-skip-permissions \
+        --add-dir "$WORKSPACE_DIR" \
+        --add-dir "$MULTIAGENTS_ROOT" \
+        --append-system-prompt "$(cat "$INSTRUCTIONS")" \
+        "$PROMPT" || true
+
+    if $work; then
         echo "[debugger $(date +%H:%M:%S)] === done ===" >> "$LOG_FILE"
         ts=$(date +%H:%M)
         "$SCRIPT_DIR/../../scripts/notify_header.sh" "$SESSION_NAME" \
             "[debugger] Fixed: $report ($ts)" 2>/dev/null || true
-    else
-        claude \
-            --dangerously-skip-permissions \
-            --add-dir "$WORKSPACE_DIR" \
-            --add-dir "$MULTIAGENTS_ROOT" \
-            --append-system-prompt "$(cat "$INSTRUCTIONS")" \
-            "$PROMPT" || true
     fi
 
     echo "[debugger] Claude exited. Restarting in 15s..."

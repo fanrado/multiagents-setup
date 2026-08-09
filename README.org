@@ -51,8 +51,12 @@ The quality of the output is directly tied to the quality of your plan:
 A reusable tmux-based workspace for multi-agent coding sessions. A single
 script call creates a fully laid-out terminal environment where four agents
 work together — one human-controlled orchestrator and three autonomous Claude
-Code agents — to plan, implement, test, debug, and validate features on
-separate git branches.
+Code agents — to plan, implement, test, debug, and validate features.
+
+All four agents share the project's working tree and whatever branch you have
+checked out. The workspace never creates, switches or rebases branches — if
+you want the work isolated on a feature branch, create it yourself before
+starting the session (or ask the orchestrator to).
 
 The workspace is designed to be project-agnostic: point it at any directory
 and it sets up the same consistent layout every time.
@@ -73,14 +77,13 @@ One tmux session, one window, four panes arranged in a 2×2 grid:
 └─────────────────────┴─────────────────────┘
 #+END_EXAMPLE
 
-| Pane          | Branch            | Role                                               |
-|---------------+-------------------+----------------------------------------------------|
-| orchestrator  | =features/<name>= | You + Claude. Draft and validate the plan in       |
-|               |                   | conversation first; only once it's fully approved  |
-|               |                   | are beads issues created and dispatched            |
-| developer     | =features/<name>= | Implements one plan phase at a time, no tests      |
-| tester        | =test/<name>=     | Writes and runs unit tests for each new feature    |
-| debugger      | =test/<name>=     | Fixes failing tests, iterates with tester          |
+| Pane          | Role                                                                   |
+|---------------+------------------------------------------------------------------------|
+| orchestrator  | You + Claude. Draft and validate the plan in conversation first; only  |
+|               | once it's fully approved are beads issues created and dispatched       |
+| developer     | Implements one plan phase at a time, no tests                          |
+| tester        | Writes and runs unit tests for each new feature                        |
+| debugger      | Fixes failing tests, iterates with tester                              |
 
 There is also a hidden fifth window, =runner= (not part of the 2×2 grid —
 switch to it with tmux's window list, =C-b w=). It's a persistent shell that
@@ -100,20 +103,19 @@ You (orchestrator, tab 1)
   │     beads issue is created per step (≤ 2 files, 1 ideal)
   │  3. Run: "$MULTIAGENTS_ROOT"/scripts/dispatch.sh <issue-id>
   ▼
-Developer (tab 2)  [features/<name> branch]
+Developer (tab 2)
   │  Reads the issue, implements the feature, commits
   │  If scope > 2 files OR the step is too vague → notifies you and waits
-  │  On success → closes issue, runs sync to test branch
+  │  On success → closes the issue
   ▼
-Tester (tab 3)  [test/<name> branch]
-  │  Detects new commits from sync
+Tester (tab 3)
+  │  Detects the new commit
   │  Writes unit tests, runs them
   │  Creates a test-report beads issue (PASS or FAIL)
   ▼
-Debugger (tab 4)  [test/<name> branch]
+Debugger (tab 4)
   │  If FAIL → fixes code, signals tester to rerun, iterates
-  │  When all tests pass → syncs back to feature branch
-  │  Creates a validation beads issue, notifies you
+  │  When all tests pass → creates a validation beads issue, notifies you
   ▼
 You (orchestrator, tab 1)
      Review, close the validation issue to confirm, or reject
@@ -139,10 +141,8 @@ machine, and you invoke it from whichever project you want to work on.
     └── .beads/              ← coordination layer, separate from your project
 
 /path/to/your-project/       ← your project repo, unchanged
-└── .worktrees/              ← created at runtime by workspace.sh
-    ├── developer/           ← isolated worktree for features/<name> branch
-    ├── tester/              ← isolated worktree for test/<name> branch
-    └── debugger/            ← isolated worktree for test/<name> branch
+                             ← all four agents work here, on the branch you
+                                have checked out
 #+END_EXAMPLE
 
 This separation means:
@@ -189,8 +189,8 @@ workspace
 
 This is because:
 - =WORKSPACE_DIR= defaults to =$(pwd)=, so the agents are rooted in your project.
-- =git worktree= commands operate on the repo in the current directory, which
-  must be your project — not the tooling repo.
+- All git commands the agents run operate on the repo in the current
+  directory, which must be your project — not the tooling repo.
 - The tooling scripts resolve their own location via =SCRIPT_DIR= at runtime,
   so they are always found correctly regardless of where you invoke them from.
 
@@ -247,8 +247,8 @@ from the orchestrator pane (tab 1):
 ~/multiagents-setup/scripts/dispatch.sh myproject-abc
 #+END_SRC
 
-The developer agent will see the issue, implement it on the =features/<name>=
-branch, and trigger the rest of the pipeline automatically.
+The developer agent will see the issue, implement it on the current branch,
+and trigger the rest of the pipeline automatically.
 
 ** Messaging an agent directly
 
@@ -331,7 +331,6 @@ multiagents-setup/
     ├── dispatch.sh             # Dispatch a plan-phase issue to the developer
     ├── notify.sh               # Send an alert to the orchestrator pane
     ├── msg.sh                  # Send a free-form message to any agent by role
-    ├── sync.sh                 # Sync between features/<name> and test/<name>
     ├── quit_workspace.sh       # C-q handler: force-stop all agents + watcher
     ├── run_in_watcher.sh       # Submit a command to the runner, live in the Watcher Log
     └── agents/

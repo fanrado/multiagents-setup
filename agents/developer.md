@@ -31,7 +31,7 @@ code for one plan phase at a time. You do not write tests.
      implementation while blocked — an ambiguous issue is the orchestrator's
      bug to fix, not yours to interpret.
 
-4. **Implement the feature** on the `features/<name>` branch:
+4. **Implement the feature** on whatever branch is currently checked out:
    - Write only production code — no test files, no test functions.
    - Keep changes minimal and scoped to the issue description.
    - If you run a build/lint/compile check to sanity-check your change (not
@@ -40,11 +40,13 @@ code for one plan phase at a time. You do not write tests.
      Watcher Log: `"$MULTIAGENTS_ROOT"/scripts/run_in_watcher.sh $SESSION_NAME "<command>"`.
    - Commit when done: `git add -p && git commit -m "<short summary>"`
 
-5. **Close the issue and trigger sync:**
+5. **Close the issue:**
    ```bash
    bd close <issue-id> --reason="Implemented: <one line summary>"
-   "$MULTIAGENTS_ROOT"/scripts/sync.sh to-test <feature-name>
    ```
+   Your commit is what signals the tester — it polls for new commits. Do not
+   create, switch, merge or rebase branches: branch layout is the user's
+   choice, and all four agents share the working tree.
 
 6. **Wait** for the next dispatch signal.
 
@@ -75,6 +77,8 @@ and continue with what you can do meanwhile; do not block idling on a reply.
   dispatch time), stop, follow the same notify + blocked flow as step 3, and
   wait — do not guess.
 - Do not push to remote. Local commits only.
+- Do not create or switch git branches. Work on the branch the user checked
+  out; if the work needs its own branch, ask the user rather than making one.
 
 ## Key commands
 
@@ -87,5 +91,4 @@ bd remember "..."
 "$MULTIAGENTS_ROOT"/scripts/notify.sh $SESSION_NAME "<message>"
 "$MULTIAGENTS_ROOT"/scripts/msg.sh <role> "<question>"   # role: tester|debugger|orchestrator
 "$MULTIAGENTS_ROOT"/scripts/run_in_watcher.sh $SESSION_NAME "<command>"
-"$MULTIAGENTS_ROOT"/scripts/sync.sh to-test <feature-name>
 ```

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Update the orchestrator pane title with a status message from an agent,
-# and show a brief auto-dismissing popup so the event surfaces immediately.
+# and flash it on the status line so the event surfaces immediately.
 # Usage: notify_header.sh <session> <message>
 set -euo pipefail
 
@@ -21,9 +21,12 @@ ORCH_PANE=$(tmux_find_pane_by_role "$SESSION" "$PANE_ORCHESTRATOR")
 # label and used to break every title-based pane lookup.
 tmux set-option -p -t "$ORCH_PANE" @status "$MESSAGE"
 
-# Show a 4-second auto-dismissing popup (tmux >= 3.2)
-tmux display-popup \
-    -t "$SESSION" \
-    -w "50%" -h "20%" \
-    -T " Agent Update " \
-    -E "printf '\\n  %s\\n' \"$MESSAGE\"; sleep 4" 2>/dev/null || true
+# Flash the message on the status line for 4 seconds.
+#
+# NOT a display-popup: a popup is modal — it grabs the keyboard until it is
+# dismissed, so the pane underneath cannot be typed into. Agents notify on
+# every finished run, and several notifications in a row (or one agent in a
+# restart loop) turn that into a window that keeps reappearing on top and
+# locks the user out of the whole workspace. display-message is transient
+# and steals no input; @status above keeps the message visible afterwards.
+tmux display-message -t "$SESSION" -d 4000 "$MESSAGE" 2>/dev/null || true
