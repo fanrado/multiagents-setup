@@ -159,6 +159,24 @@ git clone <multiagents-setup-repo-url> ~/multiagents-setup
 Clone it to a stable location. Do not move it afterwards — the alias below
 will point to this path.
 
+** Install prerequisites
+
+=setup.sh= checks for =tmux= and =bd= (beads) and installs whichever is
+missing. It also reports on =git=, =bash= and the =claude= CLI, which it does
+not install.
+
+#+BEGIN_SRC sh
+~/multiagents-setup/setup.sh            # prompts before installing anything
+~/multiagents-setup/setup.sh --check    # report only, exit 1 if something is missing
+~/multiagents-setup/setup.sh --dry-run  # print the install commands without running them
+~/multiagents-setup/setup.sh --yes      # non-interactive (CI, provisioning scripts)
+#+END_SRC
+
+=tmux= is installed with the system package manager (apt, dnf, yum, pacman,
+zypper, apk, or Homebrew on macOS) and needs =sudo=. =bd= is installed with
+the official beads installer into =~/.local/bin= (Homebrew on macOS); set
+=BEADS_INSTALL_METHOD= to =script=, =brew=, =npm= or =go= to force a method.
+
 ** Add a shell alias
 
 Add this to your =~/.zshrc= or =~/.bashrc=:
@@ -318,6 +336,7 @@ tmux ls
 #+BEGIN_EXAMPLE
 multiagents-setup/
 ├── workspace.sh               # Entry point — creates the tmux session and launches agents
+├── setup.sh                   # One-time environment check: installs tmux and bd if missing
 ├── beads-workflow.org         # Full beads coordination protocol
 ├── config/
 │   └── workspace.conf         # Session name, window name, pane titles
@@ -342,6 +361,8 @@ multiagents-setup/
 #+END_EXAMPLE
 
 * Requirements
+
+Run =./setup.sh= to check and install these (see Installation).
 
 - =tmux= ≥ 2.6 (for =select-pane -T= pane title support)
 - =bash= ≥ 4.0
