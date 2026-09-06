@@ -22,6 +22,11 @@ source "$SCRIPT_DIR/config/workspace.conf"
 source "$SCRIPT_DIR/scripts/tmux_helpers.sh"
 # shellcheck source=scripts/preflight.sh
 source "$SCRIPT_DIR/scripts/preflight.sh"
+# shellcheck source=scripts/conda_env.sh
+source "$SCRIPT_DIR/scripts/conda_env.sh"
+
+# Put the conda-installed tmux (see setup.sh) on PATH, if that env exists.
+activate_tools_env
 
 usage() {
     cat <<EOF

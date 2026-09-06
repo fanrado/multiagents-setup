@@ -12,7 +12,17 @@ set -euo pipefail
 
 TMUX_MIN_VERSION="2.6"
 LOCAL_BIN="${LOCAL_BIN:-$HOME/.local/bin}"
-CONDA_ENV_NAME="${CONDA_ENV_NAME:-multiagents-tools}"
+# Env name shared with workspace.sh, which activates it via scripts/conda_env.sh.
+SETUP_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=config/workspace.conf
+[[ -r "$SETUP_DIR/config/workspace.conf" ]] && source "$SETUP_DIR/config/workspace.conf"
+CONDA_ENV_NAME="${CONDA_ENV_NAME:-${MULTIAGENTS_CONDA_ENV:-multiagents-tools}}"
+# If the env already exists, put its tmux on PATH the same way workspace.sh does.
+# shellcheck source=scripts/conda_env.sh
+if [[ -r "$SETUP_DIR/scripts/conda_env.sh" ]]; then
+    source "$SETUP_DIR/scripts/conda_env.sh"
+    MULTIAGENTS_CONDA_ENV="$CONDA_ENV_NAME" activate_tools_env 2>/dev/null || true
+fi
 BEADS_INSTALL_URL="https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh"
 # Statically linked tmux (musl + ncurses + libevent), Linux x86_64 only.
 TMUX_STATIC_REPO="mjakob-gh/build-static-tmux"
@@ -44,7 +54,8 @@ Environment:
                          it is never chosen automatically.
   BEADS_INSTALL_METHOD   Force one of: script, brew, npm, go (default: auto).
   LOCAL_BIN              Where user-space binaries go (default: ~/.local/bin).
-  CONDA_ENV_NAME         Conda env used for tmux (default: multiagents-tools).
+  CONDA_ENV_NAME         Conda env used for tmux (default: MULTIAGENTS_CONDA_ENV from
+                         config/workspace.conf, i.e. multiagents-tools).
 USAGE
 }
 
@@ -153,8 +164,9 @@ pick_tmux_method() {
     fi
 }
 
-# Install tmux from conda-forge into a dedicated env and expose it via a symlink
-# in LOCAL_BIN, so the base env is left untouched and no activation is needed.
+# Install tmux from conda-forge into a dedicated env, leaving base untouched.
+# workspace.sh activates this env automatically (scripts/conda_env.sh); the
+# symlink in LOCAL_BIN additionally makes `tmux attach` work from a plain shell.
 install_tmux_conda() {
     local c prefix
     c="$(conda_cmd)" || { err "no conda/mamba/micromamba on PATH"; return 1; }
@@ -225,12 +237,30 @@ install_tmux() {
     esac
 }
 
+# When tmux comes from the conda env, make sure LOCAL_BIN/tmux points at it so
+# `tmux attach` also works from a plain shell where the env is not activated.
+link_conda_tmux() {
+    local tmux_path
+    tmux_path="$(command -v tmux)"
+    [[ -n "${CONDA_PREFIX:-}" && "$tmux_path" == "$CONDA_PREFIX/bin/tmux" ]] || return 0
+    [[ -e "$LOCAL_BIN/tmux" ]] && return 0
+    if [[ $CHECK_ONLY -eq 1 ]]; then
+        WARNINGS+=("tmux is only reachable inside conda env '$CONDA_ENV_NAME' (workspace.sh activates it); run setup.sh without --check to add a $LOCAL_BIN/tmux symlink for plain shells")
+        return 0
+    fi
+    ensure_local_bin
+    run ln -sf "$tmux_path" "$LOCAL_BIN/tmux"
+}
+
 check_tmux() {
     local v
     if has tmux; then
         v="$(tmux_version)"
         if [[ -n "$v" ]] && version_ge "$v" "$TMUX_MIN_VERSION"; then
             ok "tmux $v found ($(command -v tmux))"
+            [[ "${CONDA_DEFAULT_ENV:-}" == "$CONDA_ENV_NAME" ]] && \
+                info "tmux comes from conda env '$CONDA_ENV_NAME'; workspace.sh activates it automatically."
+            link_conda_tmux
             return 0
         fi
         warn "tmux $v found but >= $TMUX_MIN_VERSION is required (pane titles)."

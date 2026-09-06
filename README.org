@@ -173,10 +173,13 @@ not install.
 #+END_SRC
 
 Everything is installed into user space; =sudo= is never needed. =tmux= comes
-from conda-forge (in a dedicated =multiagents-tools= env, symlinked into
-=~/.local/bin=) when conda/mamba/micromamba is present, from Homebrew when
-=brew= is present, and otherwise as a static Linux x86_64 binary in
-=~/.local/bin=. =bd= is installed with the official beads installer into
+from conda-forge when conda/mamba/micromamba is present: it goes into a
+dedicated =multiagents-tools= env (name set by =MULTIAGENTS_CONDA_ENV= in
+=config/workspace.conf=) which =workspace.sh= activates automatically whenever
+conda and that env exist, so every agent pane sees it; a symlink in
+=~/.local/bin= also makes =tmux attach= work from a plain shell. Without
+conda, =tmux= comes from Homebrew when =brew= is present, and otherwise as a
+static Linux x86_64 binary in =~/.local/bin=. =bd= is installed with the official beads installer into
 =~/.local/bin=. Set =TMUX_INSTALL_METHOD= (=conda=, =brew=, =static=, or =pkg=
 for the system package manager, which does need sudo) or =BEADS_INSTALL_METHOD=
 (=script=, =brew=, =npm=, =go=) to force a method. Make sure =~/.local/bin= is
@@ -352,6 +355,7 @@ multiagents-setup/
 │   └── debugger.md            # Debugger agent instructions (CLAUDE.md)
 └── scripts/
     ├── tmux_helpers.sh         # Shared tmux functions (split, title, send)
+    ├── conda_env.sh            # Activate the multiagents-tools conda env (tmux) if it exists
     ├── dispatch.sh             # Dispatch a plan-phase issue to the developer
     ├── notify.sh               # Send an alert to the orchestrator pane
     ├── msg.sh                  # Send a free-form message to any agent by role
