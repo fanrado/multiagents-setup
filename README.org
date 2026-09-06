@@ -172,10 +172,15 @@ not install.
 ~/multiagents-setup/setup.sh --yes      # non-interactive (CI, provisioning scripts)
 #+END_SRC
 
-=tmux= is installed with the system package manager (apt, dnf, yum, pacman,
-zypper, apk, or Homebrew on macOS) and needs =sudo=. =bd= is installed with
-the official beads installer into =~/.local/bin= (Homebrew on macOS); set
-=BEADS_INSTALL_METHOD= to =script=, =brew=, =npm= or =go= to force a method.
+Everything is installed into user space; =sudo= is never needed. =tmux= comes
+from conda-forge (in a dedicated =multiagents-tools= env, symlinked into
+=~/.local/bin=) when conda/mamba/micromamba is present, from Homebrew when
+=brew= is present, and otherwise as a static Linux x86_64 binary in
+=~/.local/bin=. =bd= is installed with the official beads installer into
+=~/.local/bin=. Set =TMUX_INSTALL_METHOD= (=conda=, =brew=, =static=, or =pkg=
+for the system package manager, which does need sudo) or =BEADS_INSTALL_METHOD=
+(=script=, =brew=, =npm=, =go=) to force a method. Make sure =~/.local/bin= is
+on your =PATH=; the script tells you if it is not.
 
 ** Add a shell alias
 
@@ -336,7 +341,7 @@ tmux ls
 #+BEGIN_EXAMPLE
 multiagents-setup/
 ├── workspace.sh               # Entry point — creates the tmux session and launches agents
-├── setup.sh                   # One-time environment check: installs tmux and bd if missing
+├── setup.sh                   # One-time environment check: installs tmux and bd (user space, no sudo)
 ├── beads-workflow.org         # Full beads coordination protocol
 ├── config/
 │   └── workspace.conf         # Session name, window name, pane titles

@@ -1,17 +1,22 @@
 #!/usr/bin/env bash
-# setup.sh — prepare a machine to run the multiagents workspace.
+# setup.sh — prepare a machine to run the multiagents workspace, without root.
 #
-# Checks for the tools workspace.sh depends on and installs the missing ones:
-#   - tmux  (>= 2.6, needed for pane titles)            -> system package manager
-#   - bd    (beads issue tracker)                        -> official installer / brew / npm / go
-#   - claude (Claude Code CLI)                           -> checked only, never installed
-#   - git, bash >= 4                                     -> checked only
+# Checks for the tools workspace.sh depends on and installs the missing ones
+# into user space (nothing here needs sudo by default):
+#   - tmux  (>= 2.6)   -> conda-forge / Homebrew / static binary in ~/.local/bin
+#   - bd    (beads)    -> official installer into ~/.local/bin / brew / npm / go
+#   - claude (Claude Code CLI), git, bash >= 4  -> checked only, never installed
 #
 # Usage: ./setup.sh [--check] [--dry-run] [--yes] [-h]
 set -euo pipefail
 
 TMUX_MIN_VERSION="2.6"
+LOCAL_BIN="${LOCAL_BIN:-$HOME/.local/bin}"
+CONDA_ENV_NAME="${CONDA_ENV_NAME:-multiagents-tools}"
 BEADS_INSTALL_URL="https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh"
+# Statically linked tmux (musl + ncurses + libevent), Linux x86_64 only.
+TMUX_STATIC_REPO="mjakob-gh/build-static-tmux"
+TMUX_STATIC_URL="https://github.com/$TMUX_STATIC_REPO/releases/latest/download/tmux.linux-amd64.gz"
 
 CHECK_ONLY=0
 DRY_RUN=0
@@ -22,8 +27,9 @@ usage() {
 Usage: $(basename "$0") [OPTIONS]
 
 Checks that tmux and bd (beads) are installed and installs them if missing.
-Also reports on git, bash and the claude CLI, which are required but not
-installed by this script.
+Everything is installed into user space (~/.local/bin, conda, or Homebrew);
+no sudo is required. Also reports on git, bash and the claude CLI, which are
+required but not installed by this script.
 
 Options:
   --check      Only report what is installed/missing; never install (exit 1 if
@@ -33,7 +39,12 @@ Options:
   -h, --help   Show this help.
 
 Environment:
+  TMUX_INSTALL_METHOD    Force one of: conda, brew, static, pkg (default: auto).
+                         'pkg' uses the system package manager and needs sudo;
+                         it is never chosen automatically.
   BEADS_INSTALL_METHOD   Force one of: script, brew, npm, go (default: auto).
+  LOCAL_BIN              Where user-space binaries go (default: ~/.local/bin).
+  CONDA_ENV_NAME         Conda env used for tmux (default: multiagents-tools).
 USAGE
 }
 
@@ -87,17 +98,31 @@ version_ge() {
     [[ "$(printf '%s\n%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
 }
 
-# Return "sudo" when we are not root and sudo exists, "" when root.
-SUDO=""
-if [[ "$(id -u)" -ne 0 ]]; then
-    if command -v sudo > /dev/null 2>&1; then
-        SUDO="sudo"
-    fi
-fi
+has() { command -v "$1" > /dev/null 2>&1; }
 
 OS="$(uname -s)"
+ARCH="$(uname -m)"
 MISSING=()     # required tools still missing at the end
 WARNINGS=()    # non-fatal notes for the summary
+LOCAL_BIN_NOTE_ADDED=0
+
+# Make sure ~/.local/bin exists and remember to tell the user if it is not on PATH.
+ensure_local_bin() {
+    [[ $DRY_RUN -eq 1 ]] || mkdir -p "$LOCAL_BIN"
+    if [[ ":$PATH:" != *":$LOCAL_BIN:"* && $LOCAL_BIN_NOTE_ADDED -eq 0 ]]; then
+        WARNINGS+=("$LOCAL_BIN is not on PATH. Add to ~/.bashrc or ~/.zshrc:  export PATH=\"$LOCAL_BIN:\$PATH\"")
+        LOCAL_BIN_NOTE_ADDED=1
+    fi
+}
+
+# First available conda-style tool, or nothing.
+conda_cmd() {
+    local c
+    for c in micromamba mamba conda; do
+        if has "$c"; then echo "$c"; return 0; fi
+    done
+    return 1
+}
 
 # ---------------------------------------------------------------------------
 # tmux
@@ -106,40 +131,103 @@ tmux_version() {
     tmux -V 2>/dev/null | sed -E 's/^tmux[[:space:]]+//; s/[^0-9.].*$//'
 }
 
-install_tmux() {
-    if [[ "$OS" == "Darwin" ]]; then
-        if command -v brew > /dev/null 2>&1; then
-            run brew install tmux; return
-        fi
-        err "Homebrew not found. Install it from https://brew.sh then re-run, or: brew install tmux"
-        return 1
-    fi
-
-    if command -v apt-get > /dev/null 2>&1; then
-        run $SUDO apt-get update -qq
-        run $SUDO apt-get install -y tmux
-    elif command -v dnf > /dev/null 2>&1; then
-        run $SUDO dnf install -y tmux
-    elif command -v yum > /dev/null 2>&1; then
-        run $SUDO yum install -y tmux
-    elif command -v pacman > /dev/null 2>&1; then
-        run $SUDO pacman -Sy --noconfirm tmux
-    elif command -v zypper > /dev/null 2>&1; then
-        run $SUDO zypper install -y tmux
-    elif command -v apk > /dev/null 2>&1; then
-        run $SUDO apk add tmux
-    elif command -v brew > /dev/null 2>&1; then
-        run brew install tmux
+pick_tmux_method() {
+    local forced="${TMUX_INSTALL_METHOD:-auto}"
+    case "$forced" in
+        conda|brew|static|pkg) echo "$forced"; return ;;
+        auto) ;;
+        *) err "TMUX_INSTALL_METHOD must be one of: conda, brew, static, pkg"; return 1 ;;
+    esac
+    if conda_cmd > /dev/null; then
+        echo conda
+    elif has brew; then
+        echo brew
+    elif [[ "$OS" == "Linux" && "$ARCH" == "x86_64" ]] && has curl; then
+        echo static
     else
-        err "No supported package manager found (apt-get, dnf, yum, pacman, zypper, apk, brew)."
-        err "Install tmux >= $TMUX_MIN_VERSION manually: https://github.com/tmux/tmux/wiki/Installing"
+        err "No user-space install route for tmux on $OS/$ARCH."
+        err "Options: install conda/micromamba (https://mamba.readthedocs.io) or Homebrew (https://brew.sh)"
+        err "and re-run; or build tmux from source into $LOCAL_BIN; or run with"
+        err "TMUX_INSTALL_METHOD=pkg to use the system package manager (needs sudo)."
         return 1
     fi
 }
 
+# Install tmux from conda-forge into a dedicated env and expose it via a symlink
+# in LOCAL_BIN, so the base env is left untouched and no activation is needed.
+install_tmux_conda() {
+    local c prefix
+    c="$(conda_cmd)" || { err "no conda/mamba/micromamba on PATH"; return 1; }
+    ensure_local_bin
+    run "$c" create -y -n "$CONDA_ENV_NAME" -c conda-forge tmux
+    if [[ $DRY_RUN -eq 1 ]]; then
+        printf '       would run: ln -sf <%s env>/bin/tmux %s/tmux\n' "$CONDA_ENV_NAME" "$LOCAL_BIN"
+        return 0
+    fi
+    prefix="$("$c" run -n "$CONDA_ENV_NAME" sh -c 'echo "$CONDA_PREFIX"' 2>/dev/null | tail -n1)"
+    if [[ -z "$prefix" || ! -x "$prefix/bin/tmux" ]]; then
+        err "conda env '$CONDA_ENV_NAME' was created but tmux binary not found in it."
+        return 1
+    fi
+    run ln -sf "$prefix/bin/tmux" "$LOCAL_BIN/tmux"
+}
+
+# Download a statically linked tmux release into LOCAL_BIN.
+install_tmux_static() {
+    if [[ "$OS" != "Linux" || "$ARCH" != "x86_64" ]]; then
+        err "static tmux binaries are only published for Linux x86_64 (this is $OS/$ARCH)."
+        return 1
+    fi
+    has curl || { err "curl is required to download the static tmux binary."; return 1; }
+    ensure_local_bin
+    info "static binary source: https://github.com/$TMUX_STATIC_REPO (musl + ncurses + libevent)"
+    if [[ $DRY_RUN -eq 1 ]]; then
+        printf '       would run: curl -fsSL %s | gunzip > %s/tmux && chmod +x %s/tmux\n' \
+            "$TMUX_STATIC_URL" "$LOCAL_BIN" "$LOCAL_BIN"
+        return 0
+    fi
+    local tmp
+    tmp="$(mktemp "${TMPDIR:-/tmp}/tmux.XXXXXX")"
+    info "downloading $TMUX_STATIC_URL"
+    if ! curl -fsSL "$TMUX_STATIC_URL" | gunzip > "$tmp"; then
+        rm -f "$tmp"; err "download failed."; return 1
+    fi
+    chmod 755 "$tmp"
+    if ! "$tmp" -V > /dev/null 2>&1; then
+        rm -f "$tmp"; err "downloaded tmux binary does not run on this system."; return 1
+    fi
+    mv "$tmp" "$LOCAL_BIN/tmux"
+}
+
+# System package manager. Opt-in only (TMUX_INSTALL_METHOD=pkg); needs sudo.
+install_tmux_pkg() {
+    local sudo=""
+    [[ "$(id -u)" -eq 0 ]] || sudo="sudo"
+    if has apt-get;    then run $sudo apt-get update -qq; run $sudo apt-get install -y tmux
+    elif has dnf;      then run $sudo dnf install -y tmux
+    elif has yum;      then run $sudo yum install -y tmux
+    elif has pacman;   then run $sudo pacman -Sy --noconfirm tmux
+    elif has zypper;   then run $sudo zypper install -y tmux
+    elif has apk;      then run $sudo apk add tmux
+    else err "No supported system package manager found."; return 1
+    fi
+}
+
+install_tmux() {
+    local method
+    method="$(pick_tmux_method)" || return 1
+    info "installing tmux via: $method"
+    case "$method" in
+        conda)  install_tmux_conda ;;
+        brew)   run brew install tmux ;;
+        static) install_tmux_static ;;
+        pkg)    install_tmux_pkg ;;
+    esac
+}
+
 check_tmux() {
     local v
-    if command -v tmux > /dev/null 2>&1; then
+    if has tmux; then
         v="$(tmux_version)"
         if [[ -n "$v" ]] && version_ge "$v" "$TMUX_MIN_VERSION"; then
             ok "tmux $v found ($(command -v tmux))"
@@ -149,22 +237,25 @@ check_tmux() {
         WARNINGS+=("tmux is too old ($v); upgrade to >= $TMUX_MIN_VERSION")
         return 0
     fi
+    if [[ -x "$LOCAL_BIN/tmux" ]]; then
+        warn "tmux is installed at $LOCAL_BIN/tmux but that directory is not on PATH."
+        ensure_local_bin
+        return 0
+    fi
 
     warn "tmux not found."
-    if [[ $CHECK_ONLY -eq 1 ]]; then
-        MISSING+=("tmux"); return 0
-    fi
-    if ! confirm "Install tmux with the system package manager?"; then
-        MISSING+=("tmux"); return 0
-    fi
-    if ! install_tmux; then
-        MISSING+=("tmux"); return 0
-    fi
+    if [[ $CHECK_ONLY -eq 1 ]]; then MISSING+=("tmux"); return 0; fi
+    if ! confirm "Install tmux (user space, no sudo)?"; then MISSING+=("tmux"); return 0; fi
+    if ! install_tmux; then MISSING+=("tmux"); return 0; fi
     if [[ $DRY_RUN -eq 0 ]]; then
-        if command -v tmux > /dev/null 2>&1; then
-            ok "tmux $(tmux_version) installed."
+        hash -r
+        if has tmux; then
+            ok "tmux $(tmux_version) installed ($(command -v tmux))."
+        elif [[ -x "$LOCAL_BIN/tmux" ]]; then
+            ok "$("$LOCAL_BIN/tmux" -V) installed at $LOCAL_BIN/tmux."
+            ensure_local_bin
         else
-            err "tmux install finished but the binary is still not on PATH."
+            err "tmux install finished but the binary is not on PATH."
             MISSING+=("tmux")
         fi
     fi
@@ -177,6 +268,14 @@ bd_version() {
     bd version 2>/dev/null | head -n1 || bd --version 2>/dev/null | head -n1 || true
 }
 
+# npm -g only works without sudo when the global prefix is user-writable.
+npm_global_writable() {
+    has npm || return 1
+    local prefix
+    prefix="$(npm prefix -g 2>/dev/null)" || return 1
+    [[ -w "$prefix" || -w "$prefix/lib" ]]
+}
+
 pick_beads_method() {
     local forced="${BEADS_INSTALL_METHOD:-auto}"
     case "$forced" in
@@ -184,16 +283,16 @@ pick_beads_method() {
         auto) ;;
         *) err "BEADS_INSTALL_METHOD must be one of: script, brew, npm, go"; return 1 ;;
     esac
-    if command -v brew > /dev/null 2>&1 && [[ "$OS" == "Darwin" ]]; then
-        echo brew
-    elif command -v curl > /dev/null 2>&1; then
+    if has curl; then
         echo script
-    elif command -v npm > /dev/null 2>&1; then
+    elif has brew; then
+        echo brew
+    elif npm_global_writable; then
         echo npm
-    elif command -v go > /dev/null 2>&1; then
+    elif has go; then
         echo go
     else
-        err "Need one of curl, brew, npm or go to install bd."
+        err "Need one of curl, brew, npm (user-writable prefix) or go to install bd."
         return 1
     fi
 }
@@ -206,15 +305,22 @@ install_bd() {
         brew)
             run brew install beads ;;
         script)
-            # Official installer; verifies release checksums and puts bd in ~/.local/bin
-            # (or another user-writable bin dir).
+            # Official installer: verifies release checksums, installs into ~/.local/bin.
+            ensure_local_bin
             if [[ $DRY_RUN -eq 1 ]]; then
                 printf '       would run: curl -fsSL %s | bash\n' "$BEADS_INSTALL_URL"
             else
                 info "running: curl -fsSL $BEADS_INSTALL_URL | bash"
-                curl -fsSL "$BEADS_INSTALL_URL" | bash
+                # The installer exits non-zero when LOCAL_BIN is not on PATH even
+                # though bd was installed; check_bd verifies the binary afterwards.
+                curl -fsSL "$BEADS_INSTALL_URL" | bash || true
             fi ;;
         npm)
+            if ! npm_global_writable; then
+                err "npm global prefix ($(npm prefix -g 2>/dev/null)) is not writable without sudo."
+                err "Use BEADS_INSTALL_METHOD=script, or: npm config set prefix ~/.local"
+                return 1
+            fi
             run npm install -g @beads/bd ;;
         go)
             run env CGO_ENABLED=0 go install -tags gms_pure_go github.com/steveyegge/beads/cmd/bd@latest
@@ -224,35 +330,27 @@ install_bd() {
 }
 
 check_bd() {
-    if command -v bd > /dev/null 2>&1; then
+    if has bd; then
         ok "bd found: $(bd_version) ($(command -v bd))"
         return 0
     fi
-
-    # Common install location that may not be on PATH yet.
-    if [[ -x "$HOME/.local/bin/bd" ]]; then
-        warn "bd is installed at ~/.local/bin/bd but ~/.local/bin is not on PATH."
-        WARNINGS+=("add \$HOME/.local/bin to PATH (export PATH=\"\$HOME/.local/bin:\$PATH\")")
+    if [[ -x "$LOCAL_BIN/bd" ]]; then
+        warn "bd is installed at $LOCAL_BIN/bd but that directory is not on PATH."
+        ensure_local_bin
         return 0
     fi
 
     warn "bd (beads) not found."
-    if [[ $CHECK_ONLY -eq 1 ]]; then
-        MISSING+=("bd"); return 0
-    fi
-    if ! confirm "Install bd (beads)?"; then
-        MISSING+=("bd"); return 0
-    fi
-    if ! install_bd; then
-        MISSING+=("bd"); return 0
-    fi
+    if [[ $CHECK_ONLY -eq 1 ]]; then MISSING+=("bd"); return 0; fi
+    if ! confirm "Install bd (beads) (user space, no sudo)?"; then MISSING+=("bd"); return 0; fi
+    if ! install_bd; then MISSING+=("bd"); return 0; fi
     if [[ $DRY_RUN -eq 0 ]]; then
         hash -r
-        if command -v bd > /dev/null 2>&1; then
+        if has bd; then
             ok "bd installed: $(bd_version)"
-        elif [[ -x "$HOME/.local/bin/bd" ]]; then
-            ok "bd installed at ~/.local/bin/bd"
-            WARNINGS+=("add \$HOME/.local/bin to PATH (export PATH=\"\$HOME/.local/bin:\$PATH\")")
+        elif [[ -x "$LOCAL_BIN/bd" ]]; then
+            ok "bd installed at $LOCAL_BIN/bd"
+            ensure_local_bin
         else
             err "bd install finished but the binary is not on PATH."
             MISSING+=("bd")
@@ -273,16 +371,16 @@ check_bash() {
 }
 
 check_git() {
-    if command -v git > /dev/null 2>&1; then
+    if has git; then
         ok "$(git --version)"
     else
-        err "git not found. Install it with your package manager."
+        err "git not found. Install it with your package manager (or conda: conda install -c conda-forge git)."
         MISSING+=("git")
     fi
 }
 
 check_claude() {
-    if command -v claude > /dev/null 2>&1; then
+    if has claude; then
         ok "claude CLI found ($(command -v claude))"
     else
         warn "claude CLI not found. Install Claude Code and authenticate before running workspace.sh:"
@@ -294,7 +392,7 @@ check_claude() {
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
-echo "multiagents-setup environment check ($OS)"
+echo "multiagents-setup environment check ($OS/$ARCH, user-space install, no sudo)"
 [[ $CHECK_ONLY -eq 1 ]] && echo "(check only, nothing will be installed)"
 [[ $DRY_RUN -eq 1 ]]   && echo "(dry run, install commands are printed, not executed)"
 echo
