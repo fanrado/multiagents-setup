@@ -18,7 +18,32 @@ passes its own tests and follows the plan you describe in beads issues. It does
 
 ** Your responsibility as orchestrator
 
-The quality of the output is directly tied to the quality of your plan:
+*Planning is the first and most important part of the work.* Everything
+downstream — developer, tester, debugger — executes the plan literally and
+in parallel, and the pipeline has no second gate: once a =plan-phase= issue
+exists, it is being implemented. A weak plan is not caught later; it is
+built. Expect to spend more time in the orchestrator pane refining the plan
+than the agents spend implementing it, and treat that as the point, not as
+overhead.
+
+*Use the most capable model you have access to for planning.* Decomposition,
+spotting ambiguity, and reasoning about how steps interact across files is
+exactly where stronger models pay for themselves, and the orchestrator
+never writes code, so its token cost is small compared to the three
+implementing agents. Inside the orchestrator pane, switch with =/model=:
+
+#+BEGIN_SRC text
+/model opusplan   # Opus for plan mode, a faster model for everything else
+/model fable      # Fable 5.1, the most capable model, for hard or large plans
+#+END_SRC
+
+To make it permanent, add =--model opusplan= (or =fable=) to the =claude=
+invocation in =scripts/agents/orchestrator.sh= — only there, so the choice
+stays local to the planner. A cheaper model is fine for the implementing
+agents; it is a false economy for the planner.
+
+With that in mind, the quality of the output is directly tied to the quality
+of your plan:
 
 - *Structure the plan as phases containing steps.* A phase is a themed group
   (human-facing only, not a beads issue); each step inside it is the atomic
