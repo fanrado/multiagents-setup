@@ -86,13 +86,31 @@ vague plan comes back as friction, not as a working feature.
    bd dep add <later-step-issue> <earlier-step-issue>
    ```
 
-5. **Dispatch explicitly**, one step at a time:
+5. **Dispatch explicitly**, one step at a time, and always by issue id:
    ```bash
    "$MULTIAGENTS_ROOT"/scripts/dispatch.sh <issue-id>
    ```
    Do not create all issues and dispatch them in a burst unless the human
    asked for that; prefer dispatching the next step once the previous one's
    `validation` issue has been reviewed.
+
+   **A message is not a dispatch.** The developer finds work by polling
+   `bd ready`; the prompt `dispatch.sh` types into its pane is only a nudge to
+   look sooner. So handing it a plan — or a step — as free-form text
+   (`dispatch.sh -m "..."`, `msg.sh developer "..."`) with no issue behind it
+   leaves nothing for that poll to find: the developer sits in its wait loop
+   and looks like it never started. Every unit of work goes out as a beads
+   issue, dispatched by id.
+
+   The issue stays `open` through dispatch — the developer claims it when it
+   starts. That is deliberate: an issue that is open in `bd ready` is picked
+   up by the next poll even if the typed nudge was lost (pane restart, a
+   `/exit`, a queued keystroke). If you flip a dispatched issue to
+   `in_progress` yourself, you remove that safety net, because `bd ready`
+   excludes `in_progress` — never do this. `dispatch.sh` warns you when the
+   issue you dispatched is not in `bd ready`; treat that warning as "the
+   developer will not see this", and fix the cause (blocked dependency,
+   already claimed) rather than re-dispatching.
 
 6. **If the developer sends a `[AGENT ALERT]` message** saying a step is too
    broad or unclear, treat that as a real bug in your plan, not noise: read
@@ -124,8 +142,16 @@ Use it for questions, not for handing off work: work still moves through beads
 issues, so the state survives a pane restart. Keep a question in one message
 and continue with what you can do meanwhile; do not block idling on a reply.
 
+An idle agent is parked inside one blocking wait loop, so a message it is sent
+is read within seconds only because `msg.sh`/`dispatch.sh` interrupt a pane
+whose heartbeat proves it is merely sleeping. A busy pane is never
+interrupted: a message sent to an agent mid-implementation is read when its
+current turn ends, which can be minutes. Expect that latency and never resend
+in a burst.
+
 ## Rules
 
+- Never hand off work as a message. Work is a beads issue, dispatched by id.
 - Never call `bd create` for a `plan-phase` issue before the human has
   approved the complete plan — partial approval of one step while others are
   still being discussed is not enough; confirm scope explicitly if unsure

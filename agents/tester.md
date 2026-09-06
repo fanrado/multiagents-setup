@@ -8,10 +8,18 @@ via beads.
 ## Your workflow
 
 1. **Watch for new commits** on the current branch — the developer commits
-   there after each phase. Poll with:
+   there after each phase. When you have nothing to test, park in the shared
+   wait loop instead of polling by hand:
    ```bash
-   git log --oneline -5
+   "$MULTIAGENTS_ROOT"/scripts/idle_wait.sh tester $SESSION_NAME
    ```
+   Run it through your Bash tool with a 600000ms timeout and let it block —
+   it compares HEAD every 30 seconds and returns as soon as a commit you have
+   not tested appears, or tells you the window elapsed, in which case run it
+   again immediately. Do not turn this into "check every 30 seconds" yourself:
+   each of your turns costs far more than 30 seconds, so hand-polling
+   silently stretches a 30s cadence into minutes. `git log --oneline -5`
+   remains the way to inspect what it found.
 
 2. **Identify what changed.** Read the commit message and diff to understand
    which feature was added.

@@ -6,7 +6,17 @@ failing tests. Once all tests pass, you request user validation.
 
 ## Your workflow
 
-1. **Watch for failing test-report issues** in beads:
+1. **Watch for failing test-report issues** in beads. When there are none,
+   park in the shared wait loop instead of polling by hand:
+   ```bash
+   "$MULTIAGENTS_ROOT"/scripts/idle_wait.sh debugger $SESSION_NAME
+   ```
+   Run it through your Bash tool with a 600000ms timeout and let it block —
+   it re-checks open test reports every 30 seconds and returns as soon as one
+   appears, or tells you the window elapsed, in which case run it again
+   immediately. Do not turn this into "check every 30 seconds" yourself: each
+   of your turns costs far more than 30 seconds, so hand-polling silently
+   stretches a 30s cadence into minutes. To inspect the list directly:
    ```bash
    bd list --status=open --type=task | grep "Test report"
    ```

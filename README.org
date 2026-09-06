@@ -301,6 +301,40 @@ from the orchestrator pane (tab 1):
 The developer agent will see the issue, implement it on the current branch,
 and trigger the rest of the pipeline automatically.
 
+Dispatch is a nudge, not the delivery mechanism. The issue stays =open=; the
+developer claims it (=in_progress=) when it actually starts. What makes it
+find the work is its own poll of =bd ready=, so a dispatch is robust: if the
+typed prompt is lost — the pane restarted, or you had =/exit='d it — the next
+poll picks the issue up anyway. Two corollaries:
+
+- Handing the developer work as a free-form message (=dispatch.sh -m=,
+  =msg.sh=) with no beads issue behind it gives that poll nothing to find. The
+  pane then looks like it never started. Work goes out as an issue id.
+- Never flip a dispatched issue to =in_progress= yourself: =bd ready= excludes
+  =in_progress=, so that hides the issue from the very poll that is the safety
+  net. =dispatch.sh= warns when the issue you dispatched is not in =bd ready=.
+
+** Idle agents and the 30-second wait loop
+
+An agent with nothing to do parks inside one blocking call to
+=scripts/idle_wait.sh <role>=, which re-checks its own trigger — =bd ready=
+for the developer, new commits for the tester, open test reports for the
+debugger — every 30 seconds for 15 cycles, then returns and is re-run.
+
+The loop lives in a script rather than in the agent's prompt on purpose. An
+instruction like "check every 30 seconds" makes each iteration a whole model
+turn, which costs far more than 30 seconds and is not bounded by anything, so
+the real cadence silently drifts into minutes.
+
+While an agent is parked there, it is inside a tool call: text typed into its
+pane only queues until that call returns. So each wait iteration stamps a
+heartbeat file (=$TMPDIR/multiagents-<session>/<role>.idle=), and
+=dispatch.sh=/=msg.sh= interrupt the pane — Escape, claude's own interrupt —
+when that heartbeat proves it is merely sleeping. A pane doing real work is
+never interrupted, so a message to a busy agent still waits for its current
+turn to end. Tune the cadence with =AGENT_IDLE_INTERVAL= and
+=AGENT_IDLE_CYCLES= if needed.
+
 ** Messaging an agent directly
 
 =dispatch.sh= and =notify.sh= cover the two fixed edges of the routine
@@ -382,6 +416,8 @@ multiagents-setup/
     ├── tmux_helpers.sh         # Shared tmux functions (split, title, send)
     ├── conda_env.sh            # Activate the multiagents-tools conda env (tmux) if it exists
     ├── dispatch.sh             # Dispatch a plan-phase issue to the developer
+    ├── idle_wait.sh            # Bounded 30s/iteration wait loop for an idle agent
+    ├── idle.sh                 # Idle heartbeat convention + safe pane interrupt
     ├── notify.sh               # Send an alert to the orchestrator pane
     ├── msg.sh                  # Send a free-form message to any agent by role
     ├── quit_workspace.sh       # C-q handler: force-stop all agents + watcher

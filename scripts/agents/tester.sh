@@ -22,7 +22,14 @@ echo "[tester] WORKSPACE_DIR  : $WORKSPACE_DIR"
 echo "[tester] git watching   : $WORKSPACE_DIR"
 echo "[tester] bd runs from   : $WORKSPACE_DIR"
 
-POLL_PROMPT="No new commits right now. Run 'git -C $WORKSPACE_DIR log --oneline -1' every 30 seconds. As soon as a new commit appears that you haven't tested yet, write tests for it and report results via beads. Keep looping."
+# Hand the idle model one literal, bounded, blocking loop rather than the prose
+# instruction it used to get ("run git log every 30 seconds"). Prose makes each
+# iteration a whole model turn, so the real interval is unbounded and in
+# practice far longer than 30s; scripts/idle_wait.sh keeps a true 30s cadence,
+# and stamps the heartbeat that lets msg.sh interrupt this pane while it sleeps.
+POLL_CMD="\"$MULTIAGENTS_ROOT\"/scripts/idle_wait.sh tester $SESSION_NAME"
+
+POLL_PROMPT="No new commits right now. Run this exact command via your Bash tool with a 600000ms timeout and let it run to completion (it blocks itself, re-checking every 30 seconds): $POLL_CMD. If it exits after printing a new commit, write tests for that commit, run them through the shared runner, and report results via beads — then run the command again. If it exits saying the wait window elapsed with nothing found, run the exact same command again right away. Keep repeating — never leave the loop unattended."
 
 echo "[tester] Starting Claude (restart loop)..."
 

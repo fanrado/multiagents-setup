@@ -19,15 +19,22 @@ echo "[developer] WORKSPACE_DIR  : $WORKSPACE_DIR"
 # Claude Code now stays interactive by default (no auto-exit), so that restart
 # loop never fires again once a turn ends — the pane would go silent forever
 # after finishing a task instead of continuing to poll. Instead, hand the idle
-# model one literal, bounded, self-contained bash loop to run via its own Bash
-# tool: it blocks and re-polls internally, and the prompt tells the model to
-# just re-run it if it comes back empty, so refreshing no longer depends on
-# the wrapper script ever seeing `claude` exit.
-POLL_CMD='i=0; while [[ $i -lt 15 ]]; do out=$(bd ready --json 2>/dev/null); if [[ $out != "[]" ]]; then bd ready; break; fi; i=$((i+1)); echo "[developer] No open issues. Waiting, refresh in 30s... ($i/15)"; sleep 30; done'
+# model one literal, bounded, self-contained loop to run via its own Bash
+# tool: scripts/idle_wait.sh blocks and re-polls internally on a real 30s
+# cadence (an "every 30 seconds" instruction makes each iteration a whole
+# model turn, which is neither 30s nor bounded), and the prompt tells the
+# model to just re-run it if it comes back empty, so refreshing no longer
+# depends on the wrapper script ever seeing `claude` exit.
+#
+# While that call blocks, a dispatch typed into this pane only queues. That is
+# fine now: idle_wait.sh stamps a heartbeat each iteration and dispatch.sh
+# interrupts a provably-sleeping pane before typing, and even a lost keystroke
+# is recovered because a dispatched issue stays open in `bd ready`.
+POLL_CMD="\"$MULTIAGENTS_ROOT\"/scripts/idle_wait.sh developer $SESSION_NAME"
 
-POLL_PROMPT="No open issues right now. Run this exact command via your Bash tool with a 600000ms timeout and let it run to completion (it blocks itself, polling every 30 seconds): '$POLL_CMD'. If it exits after printing an issue list, read each with 'bd show <id>', implement the feature in $WORKSPACE_DIR, commit your changes, then close it with 'bd close <id>', and immediately run 'bd ready' again for more work. If it exits after 15 waiting cycles with nothing found, run the exact same command again right away. Keep repeating — never leave the loop unattended."
+POLL_PROMPT="No open issues right now. Run this exact command via your Bash tool with a 600000ms timeout and let it run to completion (it blocks itself, re-checking every 30 seconds): $POLL_CMD. If it exits after printing an issue list, read each with 'bd show <id>', claim it with 'bd update <id> --status=in_progress', implement the feature in $WORKSPACE_DIR, commit your changes, then close it with 'bd close <id>', and immediately run 'bd ready' again for more work. If it exits saying the wait window elapsed with nothing found, run the exact same command again right away. Keep repeating — never leave the loop unattended."
 
-WORK_PROMPT="Start your work session: run 'bd ready' to find open issues (skip any titled 'test report'). For each open issue, read it with 'bd show <id>', implement the feature in $WORKSPACE_DIR, commit your changes, then close the issue with 'bd close <id>'. After each issue, immediately check 'bd ready' again and continue. Keep going until there is nothing left to do, then run this exact command via your Bash tool with a 600000ms timeout and let it run to completion: '$POLL_CMD'. If it exits after printing an issue list, go back to implementing. If it exits after 15 waiting cycles with nothing found, run the exact same command again right away."
+WORK_PROMPT="Start your work session: run 'bd ready' to find open issues (skip any titled 'test report'). For each open issue, read it with 'bd show <id>', claim it with 'bd update <id> --status=in_progress', implement the feature in $WORKSPACE_DIR, commit your changes, then close the issue with 'bd close <id>'. After each issue, immediately check 'bd ready' again and continue. Keep going until there is nothing left to do, then run this exact command via your Bash tool with a 600000ms timeout and let it run to completion: $POLL_CMD. If it exits after printing an issue list, go back to implementing. If it exits saying the wait window elapsed with nothing found, run the exact same command again right away."
 
 NO_BEADS_PROMPT="No beads issue tracker is available. Explore $WORKSPACE_DIR, understand the codebase, and wait for direct instructions."
 

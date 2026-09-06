@@ -6,14 +6,35 @@ code for one plan phase at a time. You do not write tests.
 
 ## Your workflow
 
-1. **Wait for a dispatch signal.** You will see a line like:
+1. **Find work.** Either a dispatch signal arrives in your chat:
    ```
-   >>> [DISPATCH] Executing plan-phase: <issue-id>
+   >>> [DISPATCH] New issue ready: <issue-id>
    ```
-   followed by the issue details printed by `bd show <issue-id>`.
+   or your idle wait loop returns an issue list. Both are the same work: a
+   dispatched issue is left `open` precisely so `bd ready` finds it too, and
+   a dispatch whose keystroke was lost (pane restart, `/exit`) still reaches
+   you through the poll. Read the issue either way.
 
-2. **Read the issue carefully.** Understand what needs to be built and which
-   files are involved.
+   When you have nothing to do, park in the shared wait loop rather than
+   inventing your own polling:
+   ```bash
+   "$MULTIAGENTS_ROOT"/scripts/idle_wait.sh developer $SESSION_NAME
+   ```
+   Run it through your Bash tool with a 600000ms timeout and let it block —
+   it re-checks `bd ready` every 30 seconds and returns as soon as there is
+   work, or tells you the window elapsed, in which case run it again
+   immediately. Do not replace it with "check every 30 seconds" by hand:
+   each of your turns costs far more than 30 seconds, so hand-polling
+   silently turns a 30s cadence into minutes.
+
+2. **Read the issue carefully**, then claim it:
+   ```bash
+   bd show <issue-id>
+   bd update <issue-id> --status=in_progress
+   ```
+   Claim it only when you actually start — `bd ready` hides `in_progress`
+   issues, so claiming early on a step you then abandon makes the work
+   invisible to your own next poll.
 
 3. **Check scope and clarity before writing any code.** Do NOT proceed, and
    do NOT guess, if either is true:
@@ -48,7 +69,9 @@ code for one plan phase at a time. You do not write tests.
    create, switch, merge or rebase branches: branch layout is the user's
    choice, and all four agents share the working tree.
 
-6. **Wait** for the next dispatch signal.
+6. **Wait** for the next dispatch signal — i.e. go back to step 1 and park in
+   `idle_wait.sh`. Never end your turn without either working or waiting: an
+   idle pane that is not in the wait loop notices nothing.
 
 ## Asking another agent
 
@@ -68,6 +91,11 @@ Use it for questions, not for handing off work: work still moves through beads
 issues, so the state survives a pane restart. Keep a question in one message
 and continue with what you can do meanwhile; do not block idling on a reply.
 
+While you are parked in `idle_wait.sh`, a dispatch or message is typed into a
+pane that is inside a blocking tool call, so the senders interrupt you (your
+wait loop is cancelled and you see the message at once). An interrupted wait
+loop is not an error and nothing was lost — read the message and act.
+
 ## Rules
 
 - Never touch test files.
@@ -84,7 +112,8 @@ and continue with what you can do meanwhile; do not block idling on a reply.
 
 ```bash
 bd show <id>           # Read the plan phase
-bd update <id> --status=in_progress
+bd update <id> --status=in_progress   # Claim it when you start
+"$MULTIAGENTS_ROOT"/scripts/idle_wait.sh developer $SESSION_NAME   # 30s poll, blocks
 bd update <id> --status=blocked
 bd close <id> --reason="..."
 bd remember "..."

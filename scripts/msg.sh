@@ -34,6 +34,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../config/workspace.conf"
 # shellcheck source=./tmux_helpers.sh
 source "$SCRIPT_DIR/tmux_helpers.sh"
+# shellcheck source=./idle.sh
+source "$SCRIPT_DIR/idle.sh"
 
 SESSION="${3:-$SESSION_NAME}"
 
@@ -63,7 +65,7 @@ fi
 # into the claude session and its Bash-tool subprocesses, so an agent calling
 # this script needs to pass nothing. Fall back to "user" when called from
 # outside the workspace (a plain terminal has no @role).
-FROM_ROLE="unknown"
+FROM_ROLE=""
 if [[ -n "${TMUX_PANE:-}" ]]; then
     FROM_ROLE=$(tmux display-message -p -t "$TMUX_PANE" "#{@role}" 2>/dev/null || true)
 fi
@@ -73,6 +75,13 @@ if [[ "$FROM_ROLE" == "$TO_ROLE" ]]; then
     echo "msg.sh: refusing to send a message to yourself ($TO_ROLE)" >&2
     exit 1
 fi
+
+# A recipient parked in its idle wait (scripts/idle_wait.sh) is inside a
+# blocking Bash tool call, so a message typed now would sit queued until that
+# call returns — up to a full wait window later. Interrupt it first, but only
+# when its heartbeat proves it is merely sleeping.
+agent_wake_pane "$TARGET_PANE" "$TO_ROLE" "$SESSION" \
+    && echo "msg.sh: $TO_ROLE was idle-waiting — interrupted it so this is read now."
 
 # Deliver as a plain-text prompt: every agent pane runs an interactive `claude`
 # session, so this lands as a real chat message rather than a shell command.
