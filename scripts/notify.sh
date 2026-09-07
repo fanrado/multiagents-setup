@@ -11,6 +11,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../config/workspace.conf"
 # shellcheck source=./tmux_helpers.sh
 source "$SCRIPT_DIR/tmux_helpers.sh"
+# shellcheck source=./sender_guard.sh
+source "$SCRIPT_DIR/sender_guard.sh"
+
+# Blocked for the orchestrator, which is this script's own target: it has no
+# reason to notify itself, and the block keeps every send path uniform.
+deny_orchestrator_send "notify.sh"
 
 # Locate the orchestrator pane by its @role stamp (titles are not stable)
 ORCH_PANE=$(tmux_find_pane_by_role "$SESSION" "$PANE_ORCHESTRATOR")

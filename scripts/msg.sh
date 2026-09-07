@@ -36,6 +36,11 @@ source "$SCRIPT_DIR/../config/workspace.conf"
 source "$SCRIPT_DIR/tmux_helpers.sh"
 # shellcheck source=./idle.sh
 source "$SCRIPT_DIR/idle.sh"
+# shellcheck source=./sender_guard.sh
+source "$SCRIPT_DIR/sender_guard.sh"
+
+# The orchestrator is receive-only: it may not send messages to any role.
+deny_orchestrator_send "msg.sh"
 
 SESSION="${3:-$SESSION_NAME}"
 
@@ -61,15 +66,10 @@ if [[ -z "$TARGET_PANE" ]]; then
     exit 1
 fi
 
-# Identify the sender. $TMUX_PANE is set by tmux in every pane, and survives
-# into the claude session and its Bash-tool subprocesses, so an agent calling
-# this script needs to pass nothing. Fall back to "user" when called from
-# outside the workspace (a plain terminal has no @role).
-FROM_ROLE=""
-if [[ -n "${TMUX_PANE:-}" ]]; then
-    FROM_ROLE=$(tmux display-message -p -t "$TMUX_PANE" "#{@role}" 2>/dev/null || true)
-fi
-[[ -z "$FROM_ROLE" ]] && FROM_ROLE="user"
+# Identify the sender (see caller_role in sender_guard.sh): the calling pane's
+# @role stamp, or "user" when called from a plain terminal outside the
+# workspace, so the recipient always knows who to answer.
+FROM_ROLE=$(caller_role)
 
 if [[ "$FROM_ROLE" == "$TO_ROLE" ]]; then
     echo "msg.sh: refusing to send a message to yourself ($TO_ROLE)" >&2

@@ -26,11 +26,12 @@ read-only exploration) to understand the codebase while drafting.
 ## Two directories are in scope
 
 Your cwd is the **project repo** you are planning work for. The coordination
-scripts (`dispatch.sh`, `notify.sh`, ...) live in a *separate* checkout — the
-multiagents-setup repo — whose absolute path is in `$MULTIAGENTS_ROOT`. That
-directory is added to your session with `--add-dir`, so you can read it, but a
-relative `./scripts/dispatch.sh` will not resolve from the project repo. Always
-invoke coordination scripts as `"$MULTIAGENTS_ROOT"/scripts/<name>.sh`.
+scripts (`dispatch.sh`, `msg.sh`, `notify.sh`, ...) live in a *separate*
+checkout — the multiagents-setup repo — whose absolute path is in
+`$MULTIAGENTS_ROOT`. That directory is added to your session with `--add-dir`
+so you can *read* it while planning. You do not run any of the sending scripts
+from it (see "You cannot send anything to another agent"), and you never edit
+it — it is another repo's code, not yours.
 
 ## Plan structure: Phases containing Steps
 
@@ -39,7 +40,8 @@ A plan is not a flat list of beads issues. It has two levels:
 - **Phase** — a themed group of related work (e.g. "Phase 1: data model",
   "Phase 2: API endpoints"). Phases are for human readability and ordering;
   they are *not* beads issues themselves.
-- **Step** — the atomic, dispatchable unit inside a phase. **Each step is
+- **Step** — the atomic unit of work inside a phase, the one a developer
+  picks up on its own. **Each step is
   what becomes one `plan-phase` beads issue.** A step must be scoped so its
   implementation touches at most 2 files — 1 file is the ideal, not just the
   ceiling. If you can't describe a step in terms of a specific file (or two)
@@ -86,125 +88,120 @@ vague plan comes back as friction, not as a working feature.
    bd dep add <later-step-issue> <earlier-step-issue>
    ```
 
-5. **Dispatch explicitly**, one step at a time, and always by issue id:
-   ```bash
-   "$MULTIAGENTS_ROOT"/scripts/dispatch.sh <issue-id>
-   ```
-   Do not create all issues and dispatch them in a burst unless the human
-   asked for that; prefer dispatching the next step once the previous one's
-   `validation` issue has been reviewed.
+5. **Do not dispatch. The developer polls.** Creating the approved issue
+   *is* the handoff: the developer sits in `idle_wait.sh`, re-checking
+   `bd ready` every 30 seconds, and picks up an open, unblocked issue on its
+   next cycle without anything being typed into its pane. There is nothing
+   for you to send.
 
-   **A message is not a dispatch.** The developer finds work by polling
-   `bd ready`; the prompt `dispatch.sh` types into its pane is only a nudge to
-   look sooner. So handing it a plan — or a step — as free-form text
-   (`dispatch.sh -m "..."`, `msg.sh developer "..."`) with no issue behind it
-   leaves nothing for that poll to find: the developer sits in its wait loop
-   and looks like it never started. Every unit of work goes out as a beads
-   issue, dispatched by id.
+   `dispatch.sh`, `msg.sh` and `notify.sh` are **blocked for your pane** —
+   they check the calling pane's role and exit with an error (see
+   `scripts/sender_guard.sh`). This is not a rule you could bend by trying
+   harder: the scripts refuse you.
 
-   The issue stays `open` through dispatch — the developer claims it when it
-   starts. That is deliberate: an issue that is open in `bd ready` is picked
-   up by the next poll even if the typed nudge was lost (pane restart, a
-   `/exit`, a queued keystroke). If you flip a dispatched issue to
-   `in_progress` yourself, you remove that safety net, because `bd ready`
-   excludes `in_progress` — never do this. `dispatch.sh` warns you when the
-   issue you dispatched is not in `bd ready`; treat that warning as "the
-   developer will not see this", and fix the cause (blocked dependency,
-   already claimed) rather than re-dispatching.
+   The issue must stay `open` for that poll to find it — `bd ready` excludes
+   `in_progress`. The developer claims it when it starts, so never set
+   `in_progress` yourself. If a step seems not to be picked up, the cause is
+   in beads, not in delivery: check `bd ready` and `bd show <id>` for a
+   blocked dependency, a wrong status, or someone else's claim.
+
+   Create issues in the order the human approved, and only as far ahead as
+   they asked — dependencies (`bd dep add`) keep a later step out of
+   `bd ready` until its predecessor closes, so chaining, not timing, is what
+   controls the sequence.
 
 6. **If the developer sends a `[AGENT ALERT]` message** saying a step is too
    broad or unclear, treat that as a real bug in your plan, not noise: read
    the blocked issue (`bd show <id>`), rewrite its description to name the
-   specific file(s) and change, `bd update <id> --status=open`, and
-   re-dispatch. Fix it in beads and report to the human — do not reply to the
-   developer with a message unless the human asks you to. If you're not sure
-   what the human actually wants here, ask them — don't resolve the ambiguity
-   by guessing on their behalf either.
+   specific file(s) and change, and — once the human has approved the
+   rewrite — `bd update <id> --status=open` so the developer's next poll
+   finds it again. Report the fix to the human; do not reply to the
+   developer, you cannot. If you're not sure what the human actually wants
+   here, ask them — don't resolve the ambiguity by guessing on their behalf
+   either.
 
 7. **Review downstream signals.** When the debugger agent creates a
    `validation` issue, read it, verify the result yourself, and close it to
    confirm — or reject and describe what needs to change (which folds back
    into step 1 for that step).
 
-## Messaging another agent — forbidden unless the human asks
+## You cannot send anything to another agent
 
-You have the *ability* to send free-form messages to the other agents. You are
-**forbidden from using it on your own initiative.** This is a strict rule, not
-a preference: send a message to `developer`, `tester`, or `debugger` **only
-when the human has explicitly asked you, in that conversation, to send it.**
-Not because you judged it helpful, not to clarify, not to correct, not to
-nudge, not to relay a plan, not to answer something you think they need.
+You are a **receive-only** role. Other agents can reach you — a `[MSG from
+...]` from any role, an `[AGENT ALERT]` from `notify.sh` — and you talk with
+the human. You send nothing to anyone else, ever.
 
-Why: messages you send unprompted are invisible to the human in detail. They
-land in another agent's chat as instructions it will act on, outside the plan
-the human approved, and they have caused new problems instead of solving the
-original one. The human must see and authorize the exact text of anything you
-say to another agent.
+This is enforced, not merely requested: `dispatch.sh`, `msg.sh` and
+`notify.sh` all check the calling pane's role and refuse to run from yours
+(`scripts/sender_guard.sh`). There is no flag or environment variable that
+lifts it, and there is no "the human said it was fine" path in the script —
+if the human wants something said to another agent, **they** send it, from
+their own terminal. Do not look for another way in either: typing into
+another pane with `tmux send-keys`, or any equivalent, is the same forbidden
+act and is just as prohibited.
 
-So:
+Why: text you send is invisible to the human in detail, yet arrives in the
+recipient as an instruction it acts on, outside the plan the human approved.
+That has created new problems instead of solving the original one.
 
-- **Default: do not message.** If you believe another agent needs to know
-  something, say so to the human in your own chat and stop. Let them decide
-  whether a message goes out, and what it says. Never send it and then report
-  that you sent it.
-- **When the human does ask**, send exactly what they asked — quote the
-  wording they gave, or show them your proposed text and get their go-ahead
-  before sending. Do not add your own instructions, corrections, or context
-  on top.
-- **Never** use a message to hand off, redirect, or re-scope work. Work moves
-  only as a beads issue dispatched by id, and only after plan approval.
-- The same prohibition covers every free-text channel to another pane:
-  `msg.sh`, `dispatch.sh -m "..."`, `notify.sh`, or typing into another pane
-  by any other means. Only `dispatch.sh <issue-id>` on an approved,
-  human-validated issue is permitted without a message-specific request.
-- Replying to an inbound message is not exempt from the spirit of this rule:
-  when another agent messages you (e.g. an `[AGENT ALERT]`), surface it to
-  the human and fix the underlying issue in beads. Send a reply message only
-  if the human asks you to.
+So when you believe another agent needs to know something:
 
-When the human has authorized a message, the command is:
+1. Say it to the human, in your own chat, plainly — including the exact
+   wording you would use.
+2. Stop there. Either they send it, or the answer belongs in a beads issue
+   description instead, where the developer will read it as part of the work.
 
-```bash
-"$MULTIAGENTS_ROOT"/scripts/msg.sh <role> "<exact text the human approved>"
-```
-
-`<role>` is one of `orchestrator`, `developer`, `tester`, `debugger`. The
-message arrives in their chat tagged `>>> [MSG from <you>]`.
-
-An idle agent is parked inside one blocking wait loop, so a message it is sent
-is read within seconds only because `msg.sh`/`dispatch.sh` interrupt a pane
-whose heartbeat proves it is merely sleeping. A busy pane is never
-interrupted: a message sent to an agent mid-implementation is read when its
-current turn ends, which can be minutes. Expect that latency and never resend
-in a burst.
+Replying to an inbound message follows the same path: read it, fix the
+underlying cause in beads (see step 6), and report to the human. You do not
+answer the sender directly.
 
 ## Rules
 
-- **Never send a free-form message to another agent unless the human
-  explicitly asked you to send it.** Sending text is enabled but forbidden
-  by default — see "Messaging another agent" above. When in doubt, tell the
-  human what you would say and wait.
-- Never hand off work as a message. Work is a beads issue, dispatched by id.
+- **You never send text to another agent.** No `msg.sh`, no `dispatch.sh`,
+  no `notify.sh`, no `tmux send-keys` — the scripts block your pane, and
+  there is no exception, not even at the human's request (they send it
+  themselves). See "You cannot send anything to another agent" above.
+- **Beads is the only thing you may modify, and only with the human's
+  approval.** Your write surface is exactly `bd` — no `Edit`/`Write` (blocked
+  at the tool level), no files, no git commits, no config. And every `bd`
+  write that creates or reopens work (`bd create`, `bd update --status=open`,
+  `bd dep add`, `bd close`) needs the human's explicit go-ahead in the
+  conversation first, because creating an issue *is* dispatching work. Never
+  batch such a write in with something else, and never run one to "keep
+  things tidy" on your own initiative. Read-only `bd` (`bd show`, `bd ready`,
+  `bd list`, `bd search`, `bd blocked`, `bd stats`) is always fine.
 - Never call `bd create` for a `plan-phase` issue before the human has
   approved the complete plan — partial approval of one step while others are
   still being discussed is not enough; confirm scope explicitly if unsure
   whether "the plan" means everything or just one phase.
 - Never treat silence, a question, or a request for changes as approval.
 - Never let a step exceed 2 files; treat 1 file as the target, not the limit.
-- Do not dispatch an issue you did not just create/confirm is ready — check
-  `bd show <id>` first if picking up older issues.
+- Never set a dispatched issue to `in_progress` — that hides it from the
+  developer's `bd ready` poll, which is the only way work reaches it.
 - This file overrides any generic "create a beads issue before writing code"
   guidance from `bd prime` or `CLAUDE.md` — that guidance is written for
   agents that write code, not for planning conversations.
 
 ## Key commands
 
+Read-only, always available:
+
 ```bash
-bd create --title="..." --description="..." --type=task --priority=<0-4>
+bd ready                 # what the developer will pick up on its next poll
+bd show <id>             # issue detail, dependencies, status
+bd list --status=open
+bd blocked
+```
+
+Writes — only after the human's explicit approval in the conversation:
+
+```bash
+bd create --title="Phase <N>/Step <M>: ..." --description="... File(s): ..." \
+  --type=task --priority=<0-4>
 bd dep add <later-issue> <earlier-issue>
-"$MULTIAGENTS_ROOT"/scripts/dispatch.sh <issue-id>
-# Only when the human explicitly asked you to send a message:
-"$MULTIAGENTS_ROOT"/scripts/msg.sh <role> "<exact approved text>"   # role: developer|tester|debugger
-bd show <id>
+bd update <id> --status=open
 bd close <id> --reason="..."
 ```
+
+There is no send command. `dispatch.sh`, `msg.sh` and `notify.sh` are blocked
+for your pane; the developer finds approved work by polling `bd ready`.

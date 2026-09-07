@@ -68,8 +68,13 @@ of your plan:
 - *Don't create the beads issue until the plan is fully validated.* The
   developer agent picks up any open =plan-phase= issue immediately — there is
   no second gate. Discuss and refine the plan in conversation first; only
-  once you explicitly approve it should =agents/orchestrator.md= create and
-  dispatch the issue(s). See =agents/orchestrator.md= for the exact rule.
+  once you explicitly approve it should the orchestrator create the issue(s).
+  Creating the issue *is* the handoff — the developer's own =bd ready= poll
+  picks it up. See =agents/orchestrator.md= for the exact rule.
+- *The orchestrator cannot send anything to another agent.* It receives
+  messages and talks to you; =dispatch.sh=, =msg.sh= and =notify.sh= refuse to
+  run from its pane. Its only write surface is =bd=, and every =bd= write
+  needs your approval first. See "The orchestrator is receive-only" below.
 
 * Overview
 
@@ -105,7 +110,7 @@ One tmux session, one window, four panes arranged in a 2×2 grid:
 | Pane          | Role                                                                   |
 |---------------+------------------------------------------------------------------------|
 | orchestrator  | You + Claude. Draft and validate the plan in conversation first; only  |
-|               | once it's fully approved are beads issues created and dispatched       |
+|               | once it's fully approved are beads issues created. Sends nothing       |
 | developer     | Implements one plan phase at a time, no tests                          |
 | tester        | Writes and runs unit tests for each new feature                        |
 | debugger      | Fixes failing tests, iterates with tester                              |
@@ -126,7 +131,8 @@ You (orchestrator, tab 1)
   │     (no beads issues yet — you cannot edit files, only plan)
   │  2. Once you explicitly approve the full plan, one plan-phase
   │     beads issue is created per step (≤ 2 files, 1 ideal)
-  │  3. Run: "$MULTIAGENTS_ROOT"/scripts/dispatch.sh <issue-id>
+  │  3. Nothing is dispatched — the developer's bd ready poll
+  │     picks the open issue up within 30s
   ▼
 Developer (tab 2)
   │  Reads the issue, implements the feature, commits
@@ -287,10 +293,26 @@ Options:
   -h, --help            Show this help
 #+END_EXAMPLE
 
-** Dispatching a plan phase
+** How an approved phase reaches the developer
 
-Once you have written a =plan-phase= beads issue, dispatch it to the developer
-from the orchestrator pane (tab 1):
+Creating the =plan-phase= beads issue *is* the handoff. Every agent with
+nothing to do parks in =scripts/idle_wait.sh=, re-checking =bd ready= every 30
+seconds, so an open, unblocked issue is picked up on the next cycle with
+nothing typed into its pane. The developer implements it on the current branch
+and triggers the rest of the pipeline automatically.
+
+Two corollaries:
+
+- A free-form message with no beads issue behind it gives that poll nothing to
+  find, and the pane then looks like it never started. Work goes out as an
+  issue, never as text.
+- Never flip an issue to =in_progress= yourself: =bd ready= excludes
+  =in_progress=, which hides it from the very poll that delivers it. The
+  developer claims it when it actually starts.
+
+=dispatch.sh <issue-id>= still exists for *you* to nudge the developer to look
+sooner (from your own terminal, not from the orchestrator pane — see below);
+it is a nudge, never the delivery mechanism.
 
 #+BEGIN_SRC sh
 ~/multiagents-setup/scripts/dispatch.sh <issue-id>
@@ -298,21 +320,26 @@ from the orchestrator pane (tab 1):
 ~/multiagents-setup/scripts/dispatch.sh myproject-abc
 #+END_SRC
 
-The developer agent will see the issue, implement it on the current branch,
-and trigger the rest of the pipeline automatically.
+** The orchestrator is receive-only
 
-Dispatch is a nudge, not the delivery mechanism. The issue stays =open=; the
-developer claims it (=in_progress=) when it actually starts. What makes it
-find the work is its own poll of =bd ready=, so a dispatch is robust: if the
-typed prompt is lost — the pane restarted, or you had =/exit='d it — the next
-poll picks the issue up anyway. Two corollaries:
+The orchestrator plans and talks to you. It can *receive* messages from the
+other agents (=[MSG from ...]=, and =[AGENT ALERT]= via =notify.sh=), but it
+cannot send anything to anyone:
 
-- Handing the developer work as a free-form message (=dispatch.sh -m=,
-  =msg.sh=) with no beads issue behind it gives that poll nothing to find. The
-  pane then looks like it never started. Work goes out as an issue id.
-- Never flip a dispatched issue to =in_progress= yourself: =bd ready= excludes
-  =in_progress=, so that hides the issue from the very poll that is the safety
-  net. =dispatch.sh= warns when the issue you dispatched is not in =bd ready=.
+- =dispatch.sh=, =msg.sh= and =notify.sh= each check the calling pane's =@role=
+  stamp and exit with an error when it is =orchestrator=. The check lives in
+  =scripts/sender_guard.sh=, shared by all three, with no environment escape
+  hatch — an env var the orchestrator could set itself would not be a block.
+- File mutation is already off at the tool level (=--disallowed-tools
+  Edit,Write,NotebookEdit= in =scripts/agents/orchestrator.sh=). Its only write
+  surface is =bd=, and =agents/orchestrator.md= requires your explicit approval
+  in the conversation before any =bd= write that creates or reopens work.
+
+Why: text the orchestrator sends is invisible to you in detail, yet lands in
+the recipient as an instruction it acts on, outside the plan you approved —
+which has created new problems instead of solving the original one. If
+something must be said to another agent, the orchestrator tells you the exact
+wording and *you* send it with =msg.sh= from your own terminal.
 
 ** Idle agents and the 30-second wait loop
 
@@ -337,6 +364,9 @@ turn to end. Tune the cadence with =AGENT_IDLE_INTERVAL= and
 
 ** Messaging an agent directly
 
+Available to you and to the developer, tester and debugger panes — not to the
+orchestrator, which is blocked from every send path (see above).
+
 =dispatch.sh= and =notify.sh= cover the two fixed edges of the routine
 pipeline. Everything else — one agent asking another a specific, off-script
 question, or you poking a single pane from a shell — goes through =msg.sh=:
@@ -354,15 +384,6 @@ was called from, or =user= when called from a plain terminal.
 
 Messages carry questions; work still moves through beads issues, so pipeline
 state survives a pane restart.
-
-*The orchestrator is forbidden from sending messages on its own initiative.*
-Its instructions (=agents/orchestrator.md=, loaded as its system prompt on
-every start) allow =msg.sh= only when you have explicitly asked for that
-message in the conversation — including the text it should send. Unprompted
-orchestrator messages are invisible to you in detail yet act as instructions
-the receiving agent will follow, outside the plan you approved, so they tend
-to create new problems rather than solve the original one. If the orchestrator
-thinks another agent needs to know something, it tells you and waits.
 
 * Keybindings
 
@@ -424,7 +445,8 @@ multiagents-setup/
 └── scripts/
     ├── tmux_helpers.sh         # Shared tmux functions (split, title, send)
     ├── conda_env.sh            # Activate the multiagents-tools conda env (tmux) if it exists
-    ├── dispatch.sh             # Dispatch a plan-phase issue to the developer
+    ├── sender_guard.sh         # Caller role + the orchestrator send-block
+    ├── dispatch.sh             # Nudge the developer to look at an issue now
     ├── idle_wait.sh            # Bounded 30s/iteration wait loop for an idle agent
     ├── idle.sh                 # Idle heartbeat convention + safe pane interrupt
     ├── notify.sh               # Send an alert to the orchestrator pane

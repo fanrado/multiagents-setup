@@ -13,6 +13,12 @@ source "$SCRIPT_DIR/../config/workspace.conf"
 source "$SCRIPT_DIR/tmux_helpers.sh"
 # shellcheck source=./idle.sh
 source "$SCRIPT_DIR/idle.sh"
+# shellcheck source=./sender_guard.sh
+source "$SCRIPT_DIR/sender_guard.sh"
+
+# The orchestrator is receive-only: it may not dispatch or message. Checked
+# before argument parsing so neither form of the command gets through.
+deny_orchestrator_send "dispatch.sh"
 
 # Run bd against the project repo (WORKSPACE_DIR), not dispatch.sh's ambient cwd,
 # which may differ when the workspace was started with -d/--dir.
