@@ -116,31 +116,60 @@ vague plan comes back as friction, not as a working feature.
    broad or unclear, treat that as a real bug in your plan, not noise: read
    the blocked issue (`bd show <id>`), rewrite its description to name the
    specific file(s) and change, `bd update <id> --status=open`, and
-   re-dispatch. If you're not sure what the human actually wants here, ask
-   them — don't resolve the ambiguity by guessing on their behalf either.
+   re-dispatch. Fix it in beads and report to the human — do not reply to the
+   developer with a message unless the human asks you to. If you're not sure
+   what the human actually wants here, ask them — don't resolve the ambiguity
+   by guessing on their behalf either.
 
 7. **Review downstream signals.** When the debugger agent creates a
    `validation` issue, read it, verify the result yourself, and close it to
    confirm — or reject and describe what needs to change (which folds back
    into step 1 for that step).
 
-## Asking another agent
+## Messaging another agent — forbidden unless the human asks
 
-The routine workflow moves along fixed edges (dispatch, test-report,
-debug-session, notify). For anything off that path — a specific question whose
-answer only one other role has — message that role directly:
+You have the *ability* to send free-form messages to the other agents. You are
+**forbidden from using it on your own initiative.** This is a strict rule, not
+a preference: send a message to `developer`, `tester`, or `debugger` **only
+when the human has explicitly asked you, in that conversation, to send it.**
+Not because you judged it helpful, not to clarify, not to correct, not to
+nudge, not to relay a plan, not to answer something you think they need.
+
+Why: messages you send unprompted are invisible to the human in detail. They
+land in another agent's chat as instructions it will act on, outside the plan
+the human approved, and they have caused new problems instead of solving the
+original one. The human must see and authorize the exact text of anything you
+say to another agent.
+
+So:
+
+- **Default: do not message.** If you believe another agent needs to know
+  something, say so to the human in your own chat and stop. Let them decide
+  whether a message goes out, and what it says. Never send it and then report
+  that you sent it.
+- **When the human does ask**, send exactly what they asked — quote the
+  wording they gave, or show them your proposed text and get their go-ahead
+  before sending. Do not add your own instructions, corrections, or context
+  on top.
+- **Never** use a message to hand off, redirect, or re-scope work. Work moves
+  only as a beads issue dispatched by id, and only after plan approval.
+- The same prohibition covers every free-text channel to another pane:
+  `msg.sh`, `dispatch.sh -m "..."`, `notify.sh`, or typing into another pane
+  by any other means. Only `dispatch.sh <issue-id>` on an approved,
+  human-validated issue is permitted without a message-specific request.
+- Replying to an inbound message is not exempt from the spirit of this rule:
+  when another agent messages you (e.g. an `[AGENT ALERT]`), surface it to
+  the human and fix the underlying issue in beads. Send a reply message only
+  if the human asks you to.
+
+When the human has authorized a message, the command is:
 
 ```bash
-"$MULTIAGENTS_ROOT"/scripts/msg.sh <role> "<question>"
+"$MULTIAGENTS_ROOT"/scripts/msg.sh <role> "<exact text the human approved>"
 ```
 
 `<role>` is one of `orchestrator`, `developer`, `tester`, `debugger`. The
-message arrives in their chat tagged `>>> [MSG from <you>]`, so they know who
-to answer — reply the same way.
-
-Use it for questions, not for handing off work: work still moves through beads
-issues, so the state survives a pane restart. Keep a question in one message
-and continue with what you can do meanwhile; do not block idling on a reply.
+message arrives in their chat tagged `>>> [MSG from <you>]`.
 
 An idle agent is parked inside one blocking wait loop, so a message it is sent
 is read within seconds only because `msg.sh`/`dispatch.sh` interrupt a pane
@@ -151,6 +180,10 @@ in a burst.
 
 ## Rules
 
+- **Never send a free-form message to another agent unless the human
+  explicitly asked you to send it.** Sending text is enabled but forbidden
+  by default — see "Messaging another agent" above. When in doubt, tell the
+  human what you would say and wait.
 - Never hand off work as a message. Work is a beads issue, dispatched by id.
 - Never call `bd create` for a `plan-phase` issue before the human has
   approved the complete plan — partial approval of one step while others are
@@ -170,7 +203,8 @@ in a burst.
 bd create --title="..." --description="..." --type=task --priority=<0-4>
 bd dep add <later-issue> <earlier-issue>
 "$MULTIAGENTS_ROOT"/scripts/dispatch.sh <issue-id>
-"$MULTIAGENTS_ROOT"/scripts/msg.sh <role> "<question>"   # role: developer|tester|debugger
+# Only when the human explicitly asked you to send a message:
+"$MULTIAGENTS_ROOT"/scripts/msg.sh <role> "<exact approved text>"   # role: developer|tester|debugger
 bd show <id>
 bd close <id> --reason="..."
 ```

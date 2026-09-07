@@ -355,6 +355,15 @@ was called from, or =user= when called from a plain terminal.
 Messages carry questions; work still moves through beads issues, so pipeline
 state survives a pane restart.
 
+*The orchestrator is forbidden from sending messages on its own initiative.*
+Its instructions (=agents/orchestrator.md=, loaded as its system prompt on
+every start) allow =msg.sh= only when you have explicitly asked for that
+message in the conversation — including the text it should send. Unprompted
+orchestrator messages are invisible to you in detail yet act as instructions
+the receiving agent will follow, outside the plan you approved, so they tend
+to create new problems rather than solve the original one. If the orchestrator
+thinks another agent needs to know something, it tells you and waits.
+
 * Keybindings
 
 | Key     | Action                                                       |
