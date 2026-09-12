@@ -3,12 +3,12 @@
 
 * Overview
 
-This document defines how the four agents in the workspace use beads issues
+This document defines how the three agents in the workspace use beads issues
 and memory to coordinate. Every agent reads from and writes to beads as its
 primary communication channel. Direct inter-pane signalling (tmux) is used
 only for immediate human-visible alerts.
 
-Test and build commands are a separate channel: tester/debugger/developer run
+Test and build commands are a separate channel: tester and developer run
 them via =scripts/run_in_watcher.sh=, which submits the command to a
 persistent shell in the hidden =runner= window instead of the calling agent's
 own Bash tool. This makes the command a real, live process whose output
@@ -22,8 +22,7 @@ command's real exit code to the calling agent synchronously. See
 |----------------+---------------+------------------------------------------------------|
 | =plan-phase=   | Orchestrator  | One unit of work for the developer agent             |
 | =test-report=  | Tester        | Results of a test run (pass/fail + details)          |
-| =debug-session=| Debugger      | Record of a debug iteration and the fix applied      |
-| =validation=   | Debugger      | Signals the user that a feature is ready to review   |
+| =validation=   | Tester        | Signals the user that a feature is ready to review   |
 
 * Status Flow
 
@@ -47,7 +46,8 @@ open → in_progress → closed
 A plan has two levels: **phases** (themed groupings, human-facing only, not
 beads issues) and **steps** (the atomic dispatchable unit — one =plan-phase=
 beads issue per step). See =agents/orchestrator.md= for the full Phase/Step
-rules. Created by the user (or orchestrator agent) in tab 1 — but not until
+rules. Created by the user (or orchestrator agent) in the orchestrator pane
+— but not until
 the full plan has been drafted in conversation and explicitly validated by
 the human. The developer agent treats any open =plan-phase= issue as
 actionable and picks it up immediately, so issue creation is the point of no
@@ -63,7 +63,7 @@ Each issue must:
 
 If the developer finds a dispatched step too broad (>2 files) or too vague
 (no single unambiguous implementation), it runs =scripts/notify.sh= to alert
-tab 1 and sets the issue to =blocked= instead of guessing — see
+the orchestrator and sets the issue to =blocked= instead of guessing — see
 =agents/developer.md=. The orchestrator then rewrites the step's description
 and reopens it.
 
@@ -82,19 +82,17 @@ Created by the tester agent after each test run. Must include:
 - Pass/fail status.
 - Names of failing tests and error output (if any).
 
-** debug-session
-
-Created by the debugger agent for each iteration. Must include:
-- Reference to the =test-report= that triggered it.
-- Root cause identified.
-- Fix applied (file + line summary).
+On a FAIL the tester fixes the code itself rather than handing off — there is
+no debugger agent. Each debug iteration is appended to this same issue with
+=bd update <id> --notes="Root cause: ... Fix: ..."=, so the record of what
+broke and why lives with the report instead of in a separate issue.
 
 ** validation
 
-Created by the debugger agent once all tests pass. Must include:
+Created by the tester agent once all tests pass. Must include:
 - References to the original =plan-phase= and final =test-report=.
 - Summary of what was built and verified.
-- The user in tab 1 closes this issue after manual review.
+- The user closes this issue in the orchestrator pane after manual review.
 
 * Memory Conventions
 
@@ -112,29 +110,27 @@ Search with: =bd memories <keyword>=
 * Dispatch Flow
 
 #+BEGIN_EXAMPLE
-User (tab 1)
+User (orchestrator pane)
   │  drafts and refines the plan in conversation — no beads issues yet
   │  once the full plan is explicitly approved:
   │    writes plan-phase issues in beads
   │    runs: "$MULTIAGENTS_ROOT"/scripts/dispatch.sh <issue-id>
   ▼
-Developer (tab 2)
+Developer (top-right pane)
   │  receives issue ID via tmux, marks in_progress
   │  implements feature on the current branch
   │  if scope > 2 files OR the step is too vague to implement without
-  │    guessing: scripts/notify.sh → tab 1, marks blocked
+  │    guessing: scripts/notify.sh → orchestrator, marks blocked
   │  on success: closes plan-phase
   ▼
-Tester (tab 3)
+Tester (bottom-right pane)
   │  detects the new commit
   │  writes + runs unit tests
   │  creates test-report issue (pass or fail)
-  ▼
-Debugger (tab 4)
-  │  if fail: reads test-report, fixes code, signals tester to rerun
-  │  iterates until all tests pass
+  │  if fail: fixes the production code itself, commits, re-runs,
+  │    appending each iteration to the test-report — until green
   │  creates validation issue
   ▼
-User (tab 1)
+User (orchestrator pane)
      reviews validation issue, closes it to confirm or rejects
 #+END_EXAMPLE

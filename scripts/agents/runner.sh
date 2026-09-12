@@ -3,11 +3,11 @@
 # they run as a real, live process (not something buried inside an
 # individual agent's own Bash-tool sandbox) and stream into the shared
 # Watcher Log as they happen. Lives in its own tmux window ("runner"),
-# separate from the visible 2x2 agent grid, so a human can also switch to
-# it and watch commands execute like a normal terminal.
+# separate from the visible 3-pane agent layout, so a human can also switch
+# to it and watch commands execute like a normal terminal.
 #
 # See scripts/run_in_watcher.sh for how agents submit commands, and
-# agents/tester.md / agents/debugger.md for when they should.
+# agents/tester.md / agents/developer.md for when they should.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Forcefully stop every agent process and the watcher before tearing down the
 # tmux session, so nothing lingers after C-q. This matters because the
-# developer/tester/debugger/orchestrator panes all run `claude` inside a
+# developer/tester/orchestrator panes all run `claude` inside a
 # `while true` restart loop: a plain `tmux kill-session` relies on the kernel
 # delivering SIGHUP to each pane's foreground process group, which is not
 # guaranteed to reach every descendant. We never pass --continue/--resume in

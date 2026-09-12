@@ -2,7 +2,7 @@
 # Bounded idle wait for an agent pane — one literal, self-blocking loop.
 #
 # Usage: idle_wait.sh <role> [session]
-#   <role>: developer | tester | debugger
+#   <role>: developer | tester
 #
 # Exit 0  — work appeared; the details are printed on stdout.
 # Exit 10 — the wait window elapsed with nothing found; the caller re-runs it.
@@ -10,8 +10,8 @@
 # Why this is a script and not prose in the prompt: an idle agent used to be
 # told "run <cmd> every 30 seconds", which makes every iteration a whole model
 # turn — the real interval is then unbounded and in practice far longer than
-# 30s. Only developer.sh had a literal loop. Keeping the loop here gives all
-# three agents the same honest 30s cadence, one place to change the policy,
+# 30s. Only developer.sh had a literal loop. Keeping the loop here gives both
+# polling agents the same honest 30s cadence, one place to change the policy,
 # and no shell quoting buried in a prompt string.
 #
 # Each iteration stamps a heartbeat file before sleeping (see scripts/idle.sh),
@@ -74,13 +74,6 @@ probe() {
             git -C "$WORKSPACE_DIR" log -1 --pretty=format:"%s (%h)" 2>/dev/null
             echo
             git -C "$WORKSPACE_DIR" show --stat HEAD 2>/dev/null | head -20
-            ;;
-        debugger)
-            local reports
-            reports=$(bd list --status=open 2>/dev/null | grep -i 'test.report' || true)
-            [[ -z "$reports" ]] && return 1
-            echo "Open test report(s):"
-            echo "$reports"
             ;;
         *)
             echo "idle_wait.sh: unknown role '$ROLE'" >&2

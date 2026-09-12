@@ -6,20 +6,20 @@
 
 ** Prerequisites
 
-This workspace requires an active *Claude subscription plan*. The developer,
-tester, and debugger agents each run a persistent Claude Code process — all
-three consume API capacity simultaneously.
+This workspace requires an active *Claude subscription plan*. The
+orchestrator, developer and tester agents each run a persistent Claude Code
+process — all three consume API capacity simultaneously.
 
 ** What this workspace does (and does not) guarantee
 
-The developer → tester → debugger pipeline is designed to produce code that
-passes its own tests and follows the plan you describe in beads issues. It does
-*not* guarantee correctness beyond what the tests cover.
+The developer → tester pipeline is designed to produce code that passes its
+own tests and follows the plan you describe in beads issues. It does *not*
+guarantee correctness beyond what the tests cover.
 
 ** Your responsibility as orchestrator
 
 *Planning is the first and most important part of the work.* Everything
-downstream — developer, tester, debugger — executes the plan literally and
+downstream — developer, tester — executes the plan literally and
 in parallel, and the pipeline has no second gate: once a =plan-phase= issue
 exists, it is being implemented. A weak plan is not caught later; it is
 built. Expect to spend more time in the orchestrator pane refining the plan
@@ -29,7 +29,7 @@ overhead.
 *Use the most capable model you have access to for planning.* Decomposition,
 spotting ambiguity, and reasoning about how steps interact across files is
 exactly where stronger models pay for themselves, and the orchestrator
-never writes code, so its token cost is small compared to the three
+never writes code, so its token cost is small compared to the two
 implementing agents. Inside the orchestrator pane, switch with =/model=:
 
 #+BEGIN_SRC text
@@ -79,11 +79,11 @@ of your plan:
 * Overview
 
 A reusable tmux-based workspace for multi-agent coding sessions. A single
-script call creates a fully laid-out terminal environment where four agents
-work together — one human-controlled orchestrator and three autonomous Claude
+script call creates a fully laid-out terminal environment where three agents
+work together — one human-controlled orchestrator and two autonomous Claude
 Code agents — to plan, implement, test, debug, and validate features.
 
-All four agents share the project's working tree and whatever branch you have
+All three agents share the project's working tree and whatever branch you have
 checked out. The workspace never creates, switches or rebases branches — if
 you want the work isolated on a feature branch, create it yourself before
 starting the session (or ask the orchestrator to).
@@ -93,17 +93,16 @@ and it sets up the same consistent layout every time.
 
 * Layout
 
-One tmux session, one window, four panes arranged in a 2×2 grid:
+One tmux session, one window, three agent panes: the orchestrator holds the
+full-height left column, and the developer and tester stack in the right one.
 
 #+BEGIN_EXAMPLE
 ┌─────────────────────┬─────────────────────┐
-│                     │                     │
-│    orchestrator     │     developer       │
-│     (you)           │   (Claude Code)     │
-├─────────────────────┼─────────────────────┤
-│                     │                     │
-│      tester         │     debugger        │
-│   (Claude Code)     │   (Claude Code)     │
+│                     │     developer       │
+│                     │   (Claude Code)     │
+│    orchestrator     ├─────────────────────┤
+│       (you)         │      tester         │
+│                     │   (Claude Code)     │
 └─────────────────────┴─────────────────────┘
 #+END_EXAMPLE
 
@@ -112,12 +111,16 @@ One tmux session, one window, four panes arranged in a 2×2 grid:
 | orchestrator  | You + Claude. Draft and validate the plan in conversation first; only  |
 |               | once it's fully approved are beads issues created. Sends nothing       |
 | developer     | Implements one plan phase at a time, no tests                          |
-| tester        | Writes and runs unit tests for each new feature                        |
-| debugger      | Fixes failing tests, iterates with tester                              |
+| tester        | Writes and runs unit tests for each new feature, and fixes the code    |
+|               | itself when they fail                                                  |
 
-There is also a hidden fifth window, =runner= (not part of the 2×2 grid —
-switch to it with tmux's window list, =C-b w=). It's a persistent shell that
-tester/debugger/developer route test and build commands through (via
+The orchestrator gets the full height because it is the pane you actually read
+and type in: plans are long, and the conversation that produces them is the
+part of the session worth seeing without scrolling.
+
+There is also a hidden second window, =runner= (not part of the visible
+layout — switch to it with tmux's window list, =C-b w=). It's a persistent
+shell that the tester and developer route test and build commands through (via
 =scripts/run_in_watcher.sh=) instead of running them inside their own Claude
 session's Bash tool, so the output is a real live process that streams into
 the Watcher Log as it happens, not something buried invisibly until a whole
@@ -126,7 +129,7 @@ Claude turn finishes. See =scripts/agents/runner.sh=.
 * Workflow
 
 #+BEGIN_EXAMPLE
-You (orchestrator, tab 1)
+You (orchestrator, left)
   │  1. Draft the plan as phases, each broken into steps
   │     (no beads issues yet — you cannot edit files, only plan)
   │  2. Once you explicitly approve the full plan, one plan-phase
@@ -134,21 +137,20 @@ You (orchestrator, tab 1)
   │  3. Nothing is dispatched — the developer's bd ready poll
   │     picks the open issue up within 30s
   ▼
-Developer (tab 2)
+Developer (top right)
   │  Reads the issue, implements the feature, commits
   │  If scope > 2 files OR the step is too vague → notifies you and waits
   │  On success → closes the issue
   ▼
-Tester (tab 3)
+Tester (bottom right)
   │  Detects the new commit
   │  Writes unit tests, runs them
   │  Creates a test-report beads issue (PASS or FAIL)
-  ▼
-Debugger (tab 4)
-  │  If FAIL → fixes code, signals tester to rerun, iterates
+  │  If FAIL → fixes the production code itself, commits, re-runs,
+  │    recording each iteration on the test-report — until green
   │  When all tests pass → creates a validation beads issue, notifies you
   ▼
-You (orchestrator, tab 1)
+You (orchestrator, left)
      Review, close the validation issue to confirm, or reject
 #+END_EXAMPLE
 
@@ -172,7 +174,7 @@ machine, and you invoke it from whichever project you want to work on.
     └── .beads/              ← coordination layer, separate from your project
 
 /path/to/your-project/       ← your project repo, unchanged
-                             ← all four agents work here, on the branch you
+                             ← all three agents work here, on the branch you
                                 have checked out
 #+END_EXAMPLE
 
@@ -262,7 +264,8 @@ workspace
 #+END_SRC
 
 Opens a session named =multiagents= rooted in the current directory.
-The developer, tester, and debugger agents start automatically in their panes.
+The orchestrator, developer and tester agents start automatically in their
+panes.
 
 ** Custom session name
 
@@ -345,8 +348,12 @@ wording and *you* send it with =msg.sh= from your own terminal.
 
 An agent with nothing to do parks inside one blocking call to
 =scripts/idle_wait.sh <role>=, which re-checks its own trigger — =bd ready=
-for the developer, new commits for the tester, open test reports for the
-debugger — every 30 seconds for 15 cycles, then returns and is re-run.
+for the developer, new commits for the tester — every 30 seconds for 15
+cycles, then returns and is re-run.
+
+Because the tester now commits its own fixes, it would otherwise wake on its
+own commit and re-test what it just verified; =scripts/mark_tested.sh= stamps
+that commit as already seen, which closes the loop.
 
 The loop lives in a script rather than in the agent's prompt on purpose. An
 instruction like "check every 30 seconds" makes each iteration a whole model
@@ -364,7 +371,7 @@ turn to end. Tune the cadence with =AGENT_IDLE_INTERVAL= and
 
 ** Messaging an agent directly
 
-Available to you and to the developer, tester and debugger panes — not to the
+Available to you and to the developer and tester panes — not to the
 orchestrator, which is blocked from every send path (see above).
 
 =dispatch.sh= and =notify.sh= cover the two fixed edges of the routine
@@ -377,7 +384,7 @@ question, or you poking a single pane from a shell — goes through =msg.sh=:
 ~/multiagents-setup/scripts/msg.sh tester "Which fixture does test_auth_flow use?"
 #+END_SRC
 
-=<role>= is =orchestrator=, =developer=, =tester=, or =debugger=. The recipient
+=<role>= is =orchestrator=, =developer=, or =tester=. The recipient
 pane is resolved by its =@role= stamp, and the message arrives tagged
 =>>> [MSG from <sender>]= — the sender being the role of the pane the script
 was called from, or =user= when called from a plain terminal.
@@ -440,8 +447,7 @@ multiagents-setup/
 ├── agents/
 │   ├── orchestrator.md        # Orchestrator agent instructions (CLAUDE.md)
 │   ├── developer.md           # Developer agent instructions (CLAUDE.md)
-│   ├── tester.md              # Tester agent instructions (CLAUDE.md)
-│   └── debugger.md            # Debugger agent instructions (CLAUDE.md)
+│   └── tester.md              # Tester agent instructions (CLAUDE.md)
 └── scripts/
     ├── tmux_helpers.sh         # Shared tmux functions (split, title, send)
     ├── conda_env.sh            # Activate the multiagents-tools conda env (tmux) if it exists
@@ -449,15 +455,16 @@ multiagents-setup/
     ├── dispatch.sh             # Nudge the developer to look at an issue now
     ├── idle_wait.sh            # Bounded 30s/iteration wait loop for an idle agent
     ├── idle.sh                 # Idle heartbeat convention + safe pane interrupt
+    ├── mark_tested.sh          # Stamp HEAD as tested, so the tester skips its own fixes
     ├── notify.sh               # Send an alert to the orchestrator pane
     ├── msg.sh                  # Send a free-form message to any agent by role
     ├── quit_workspace.sh       # C-q handler: force-stop all agents + watcher
+    ├── resize_panes.sh         # client-resized hook: keep the 3-pane layout proportional
     ├── run_in_watcher.sh       # Submit a command to the runner, live in the Watcher Log
     └── agents/
         ├── orchestrator.sh     # Launch orchestrator Claude Code agent
         ├── developer.sh        # Launch developer Claude Code agent
         ├── tester.sh           # Launch tester Claude Code agent
-        ├── debugger.sh         # Launch debugger Claude Code agent
         └── runner.sh           # Persistent shell that executes run_in_watcher.sh commands
 #+END_EXAMPLE
 

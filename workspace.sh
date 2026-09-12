@@ -32,13 +32,13 @@ usage() {
     cat <<EOF
 Usage: $(basename "$0") [OPTIONS]
 
-Opens a tmux workspace session with a 2×2 agent grid and a logs button pane.
+Opens a tmux workspace session with 3 agent panes and a logs button pane.
 
 Layout:
   ┌─────────────────┬─────────────────┐
-  │  orchestrator   │   developer     │
-  ├─────────────────┼─────────────────┤
-  │    tester       │   debugger      │
+  │                 │   developer     │
+  │  orchestrator   ├─────────────────┤
+  │                 │    tester       │
   ├─────────────────┴─────────────────┤
   │  [ Logs ]  (click to open log)    │
   └───────────────────────────────────┘
@@ -113,20 +113,19 @@ fi
 echo "Starting workspace: $SESSION_NAME"
 echo "Working directory:  $WORKSPACE_DIR"
 
-# Step 1 — create session; capture the first pane ID (top-left)
+# Step 1 — create session; capture the first pane ID (the full-height left column)
 tmux new-session -d -s "$SESSION_NAME" -n "$WINDOW_NAME" -c "$WORKSPACE_DIR"
-TL=$(tmux_pane_id "${SESSION_NAME}:${WINDOW_NAME}")   # top-left
+LEFT=$(tmux_pane_id "${SESSION_NAME}:${WINDOW_NAME}")   # left, full height
 
-# Step 2 — split top-left rightward → top-right
-TR=$(tmux_split_h "$TL" "$WORKSPACE_DIR")             # top-right
+# Step 2 — split the left column rightward → right column
+TR=$(tmux_split_h "$LEFT" "$WORKSPACE_DIR")            # top-right
 
-# Step 3 — split top-left downward → bottom-left
-BL=$(tmux_split_v "$TL" "$WORKSPACE_DIR")             # bottom-left
+# Step 3 — split the right column downward. Only the right column is split
+# vertically, which is what keeps the orchestrator at the full height of the
+# window: a 3-pane layout rather than a 2×2 grid.
+BR=$(tmux_split_v "$TR" "$WORKSPACE_DIR")              # bottom-right
 
-# Step 4 — split top-right downward → bottom-right
-BR=$(tmux_split_v "$TR" "$WORKSPACE_DIR")             # bottom-right
-
-# Step 5 — full-width 2-line logs button pane at the very bottom
+# Step 4 — full-width 2-line logs button pane at the very bottom
 LOGS_BTN=$(tmux split-window -v -f -l 2 -t "${SESSION_NAME}:${WINDOW_NAME}" \
     -c "$WORKSPACE_DIR" -P -F "#{pane_id}")
 
@@ -136,10 +135,9 @@ tmux set-option -t "$SESSION_NAME" pane-border-status top
 # Label each pane and stamp its permanent role. Scripts look panes up by
 # @role, never by title: claude rewrites the pane title with the task it is
 # working on, which used to make dispatch.sh & co. lose the developer pane.
-tmux_pane_role "$TL" "$PANE_ORCHESTRATOR"
+tmux_pane_role "$LEFT" "$PANE_ORCHESTRATOR"
 tmux_pane_role "$TR" "$PANE_DEVELOPER"
-tmux_pane_role "$BL" "$PANE_TESTER"
-tmux_pane_role "$BR" "$PANE_DEBUGGER"
+tmux_pane_role "$BR" "$PANE_TESTER"
 tmux_pane_role "$LOGS_BTN" "logs"
 
 
@@ -148,20 +146,20 @@ tmux_apply_theme "$SESSION_NAME"
 
 # Store all pane IDs so the resize hook can redistribute space proportionally
 tmux set-option -t "$SESSION_NAME" @logs_pane_id "$LOGS_BTN"
-tmux set-option -t "$SESSION_NAME" @tl_pane_id   "$TL"
+tmux set-option -t "$SESSION_NAME" @left_pane_id "$LEFT"
 tmux set-option -t "$SESSION_NAME" @tr_pane_id   "$TR"
-tmux set-option -t "$SESSION_NAME" @bl_pane_id   "$BL"
 tmux set-option -t "$SESSION_NAME" @br_pane_id   "$BR"
 
-# On every terminal resize: evenly distribute the 2×2 grid and keep logs at 2 lines.
+# On every terminal resize: split the width evenly between the orchestrator
+# column and the stacked right column, and keep logs at 2 lines.
 tmux set-hook -t "$SESSION_NAME" client-resized \
     "run-shell '$SCRIPT_DIR/scripts/resize_panes.sh #{session_name}'"
 
-# Step 6 — hidden "runner" window: a persistent shell that executes commands
-# submitted via scripts/run_in_watcher.sh, so tester/debugger test runs are
-# real live processes streaming into the Watcher Log, not something buried
+# Step 5 — hidden "runner" window: a persistent shell that executes commands
+# submitted via scripts/run_in_watcher.sh, so the tester's test and build runs
+# are real live processes streaming into the Watcher Log, not something buried
 # inside an individual agent's own Bash-tool sandbox. Not part of the visible
-# 2x2 grid; switch to it with tmux's window list (C-b w) to watch it directly.
+# 3-pane layout; switch to it with tmux's window list (C-b w) to watch it.
 tmux new-window -d -n runner -t "$SESSION_NAME" -c "$WORKSPACE_DIR"
 tmux_pane_role "$(tmux_pane_id "${SESSION_NAME}:runner")" "runner"
 
@@ -194,10 +192,9 @@ tmux bind-key -T root MouseDragEnd1Border ''
 tmux bind-key -n C-q run-shell "$SCRIPT_DIR/scripts/quit_workspace.sh #{session_name}"
 
 # Launch agents in their respective panes
-tmux send-keys -t "$TL" "$SCRIPT_DIR/scripts/agents/orchestrator.sh" Enter
+tmux send-keys -t "$LEFT" "$SCRIPT_DIR/scripts/agents/orchestrator.sh" Enter
 tmux send-keys -t "$TR" "$SCRIPT_DIR/scripts/agents/developer.sh" Enter
-tmux send-keys -t "$BL" "$SCRIPT_DIR/scripts/agents/tester.sh" Enter
-tmux send-keys -t "$BR" "$SCRIPT_DIR/scripts/agents/debugger.sh" Enter
+tmux send-keys -t "$BR" "$SCRIPT_DIR/scripts/agents/tester.sh" Enter
 tmux send-keys -t "$LOGS_BTN" "$SCRIPT_DIR/scripts/logs_button.sh" Enter
 tmux send-keys -t "${SESSION_NAME}:runner" "$SCRIPT_DIR/scripts/agents/runner.sh" Enter
 
@@ -207,6 +204,6 @@ SESSION_NAME="$SESSION_NAME" WORKSPACE_DIR="$WORKSPACE_DIR" "$SCRIPT_DIR/scripts
 disown
 
 # Start focused on the orchestrator pane
-tmux select-pane -t "$TL"
+tmux select-pane -t "$LEFT"
 
 exec tmux attach-session -t "$SESSION_NAME"

@@ -10,7 +10,7 @@
 # Usage:
 #   msg.sh <to-role> <message> [session-name]
 #
-#   <to-role>  orchestrator | developer | tester | debugger
+#   <to-role>  orchestrator | developer | tester
 #
 # The sender is inferred from the calling pane's @role stamp, so the recipient
 # always knows who to answer.
@@ -18,7 +18,7 @@ set -euo pipefail
 
 usage() {
     echo "Usage: msg.sh <to-role> <message> [session-name]" >&2
-    echo "  <to-role>: orchestrator | developer | tester | debugger" >&2
+    echo "  <to-role>: orchestrator | developer | tester" >&2
 }
 
 TO_ROLE="${1:-}"
@@ -45,7 +45,7 @@ deny_orchestrator_send "msg.sh"
 SESSION="${3:-$SESSION_NAME}"
 
 case "$TO_ROLE" in
-    "$PANE_ORCHESTRATOR"|"$PANE_DEVELOPER"|"$PANE_TESTER"|"$PANE_DEBUGGER") ;;
+    "$PANE_ORCHESTRATOR"|"$PANE_DEVELOPER"|"$PANE_TESTER") ;;
     *)
         echo "msg.sh: unknown role '$TO_ROLE'" >&2
         usage

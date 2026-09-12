@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Background event loop — logs workspace activity and exits when the session ends.
-# Agents (developer, tester, debugger) are self-driving via polling loops;
+# Agents (developer, tester) are self-driving via polling loops;
 # this watcher exists only for visibility and orchestrator notifications.
 #
 # Launched by workspace.sh; exits automatically when the tmux session ends.

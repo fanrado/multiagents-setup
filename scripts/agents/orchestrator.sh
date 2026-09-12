@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Orchestrator agent — runs Claude in a restart loop, same pattern as
-# developer/tester/debugger, so the planning instructions are always loaded
+# developer/tester, so the planning instructions are always loaded
 # whenever a Claude session starts in this pane (including after a manual
 # /exit or a crash). This pane is interactive and human-present, so each run
 # is foreground with normal permission prompts (no --dangerously-skip-permissions).
