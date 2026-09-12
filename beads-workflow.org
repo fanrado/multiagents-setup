@@ -12,7 +12,7 @@ Test and build commands are a separate channel: tester and developer run
 them via =scripts/run_in_watcher.sh=, which submits the command to a
 persistent shell in the hidden =runner= window instead of the calling agent's
 own Bash tool. This makes the command a real, live process whose output
-streams into the Watcher Log as it happens, while still returning the
+streams into the watcher log as it happens, while still returning the
 command's real exit code to the calling agent synchronously. See
 =scripts/agents/runner.sh=.
 

@@ -64,7 +64,7 @@ Write tests for the new feature and run the test suite in $WORKSPACE_DIR. If any
     # Never pipe claude into `tee`: that hands it a non-TTY stdout, so the
     # interactive session exits immediately instead of waiting for the user,
     # and this loop spins — restarting every 15s and firing a notification
-    # each time. Test and fix output already reaches the Watcher Log through
+    # each time. Test and fix output already reaches the watcher log through
     # scripts/run_in_watcher.sh; only the session markers are logged here.
     [[ "$work" == true ]] && \
         echo "[tester $(date +%H:%M:%S)] === test run: $short ===" >> "$LOG_FILE"

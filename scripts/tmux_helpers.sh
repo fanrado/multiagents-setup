@@ -71,6 +71,6 @@ tmux_apply_theme() {
     tmux set-option -t "$session" pane-border-format \
         " #[bold]#{?@role,#{@role},#{pane_title}}#[nobold]#{?@status, — #{@status},} "
 
-    # Enable mouse (required for the logs pane click binding)
+    # Enable mouse: click-to-select panes and scrollback in the agent panes
     tmux set-option -t "$session" mouse on
 }

@@ -123,8 +123,21 @@ layout — switch to it with tmux's window list, =C-b w=). It's a persistent
 shell that the tester and developer route test and build commands through (via
 =scripts/run_in_watcher.sh=) instead of running them inside their own Claude
 session's Bash tool, so the output is a real live process that streams into
-the Watcher Log as it happens, not something buried invisibly until a whole
+the watcher log as it happens, not something buried invisibly until a whole
 Claude turn finishes. See =scripts/agents/runner.sh=.
+
+** Watching the log
+
+Every agent event and every command the runner executes is appended to one
+log file per session:
+
+#+BEGIN_SRC sh
+tail -f ${TMPDIR:-/tmp}/multiagents-multiagents/watcher.log   # default session
+tail -f ${TMPDIR:-/tmp}/multiagents-<session>/watcher.log     # named session
+#+END_SRC
+
+Run that in any spare terminal. =C-b w= → =runner= is the other way to watch a
+test run as it happens, since that window *is* the shell executing it.
 
 * Workflow
 
@@ -460,7 +473,7 @@ multiagents-setup/
     ├── msg.sh                  # Send a free-form message to any agent by role
     ├── quit_workspace.sh       # C-q handler: force-stop all agents + watcher
     ├── resize_panes.sh         # client-resized hook: keep the 3-pane layout proportional
-    ├── run_in_watcher.sh       # Submit a command to the runner, live in the Watcher Log
+    ├── run_in_watcher.sh       # Submit a command to the runner, live in the watcher log
     └── agents/
         ├── orchestrator.sh     # Launch orchestrator Claude Code agent
         ├── developer.sh        # Launch developer Claude Code agent

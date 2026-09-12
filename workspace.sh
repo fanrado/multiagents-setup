@@ -32,20 +32,19 @@ usage() {
     cat <<EOF
 Usage: $(basename "$0") [OPTIONS]
 
-Opens a tmux workspace session with 3 agent panes and a logs button pane.
+Opens a tmux workspace session with 3 agent panes.
 
 Layout:
   ┌─────────────────┬─────────────────┐
   │                 │   developer     │
   │  orchestrator   ├─────────────────┤
   │                 │    tester       │
-  ├─────────────────┴─────────────────┤
-  │  [ Logs ]  (click to open log)    │
-  └───────────────────────────────────┘
+  └─────────────────┴─────────────────┘
 
 Plus a hidden "runner" window (not shown above, switch with C-b w): a
-persistent shell that test/build commands run in via scripts/run_in_watcher.sh,
-so their output streams live into the Watcher Log.
+persistent shell that test/build commands run in via scripts/run_in_watcher.sh.
+Their output streams live into the watcher log, which you read with:
+  tail -f \${TMPDIR:-/tmp}/multiagents-<session>/watcher.log
 
 Options:
   -s, --session NAME    Session name (default: $SESSION_NAME)
@@ -125,10 +124,6 @@ TR=$(tmux_split_h "$LEFT" "$WORKSPACE_DIR")            # top-right
 # window: a 3-pane layout rather than a 2×2 grid.
 BR=$(tmux_split_v "$TR" "$WORKSPACE_DIR")              # bottom-right
 
-# Step 4 — full-width 2-line logs button pane at the very bottom
-LOGS_BTN=$(tmux split-window -v -f -l 2 -t "${SESSION_NAME}:${WINDOW_NAME}" \
-    -c "$WORKSPACE_DIR" -P -F "#{pane_id}")
-
 # Show pane titles in the border header of each pane
 tmux set-option -t "$SESSION_NAME" pane-border-status top
 
@@ -138,26 +133,24 @@ tmux set-option -t "$SESSION_NAME" pane-border-status top
 tmux_pane_role "$LEFT" "$PANE_ORCHESTRATOR"
 tmux_pane_role "$TR" "$PANE_DEVELOPER"
 tmux_pane_role "$BR" "$PANE_TESTER"
-tmux_pane_role "$LOGS_BTN" "logs"
 
 
 # Apply unified color theme
 tmux_apply_theme "$SESSION_NAME"
 
 # Store all pane IDs so the resize hook can redistribute space proportionally
-tmux set-option -t "$SESSION_NAME" @logs_pane_id "$LOGS_BTN"
 tmux set-option -t "$SESSION_NAME" @left_pane_id "$LEFT"
 tmux set-option -t "$SESSION_NAME" @tr_pane_id   "$TR"
 tmux set-option -t "$SESSION_NAME" @br_pane_id   "$BR"
 
 # On every terminal resize: split the width evenly between the orchestrator
-# column and the stacked right column, and keep logs at 2 lines.
+# column and the stacked right column.
 tmux set-hook -t "$SESSION_NAME" client-resized \
     "run-shell '$SCRIPT_DIR/scripts/resize_panes.sh #{session_name}'"
 
-# Step 5 — hidden "runner" window: a persistent shell that executes commands
+# Step 4 — hidden "runner" window: a persistent shell that executes commands
 # submitted via scripts/run_in_watcher.sh, so the tester's test and build runs
-# are real live processes streaming into the Watcher Log, not something buried
+# are real live processes streaming into the watcher log, not something buried
 # inside an individual agent's own Bash-tool sandbox. Not part of the visible
 # 3-pane layout; switch to it with tmux's window list (C-b w) to watch it.
 tmux new-window -d -n runner -t "$SESSION_NAME" -c "$WORKSPACE_DIR"
@@ -174,12 +167,23 @@ for _w in $(tmux list-windows -t "$SESSION_NAME" -F "#{window_id}"); do
 done
 unset _w
 
-# Left-click on the logs pane → open popup; anywhere else → normal pane select
-tmux bind-key -T root MouseDown1Pane \
-    if-shell -F '#{==:#{pane_id},#{@logs_pane_id}}' \
-    "display-popup -E -w 80% -h 70% -T ' Watcher Log ' \
-     '$SCRIPT_DIR/scripts/show_watcher_log.sh #{session_name}'" \
-    "select-pane -t '#{pane_id}'; send-keys -M"
+# Restore tmux's default left-click behaviour explicitly: select the pane and
+# forward the click, which is what all three agent panes want.
+#
+# This is a reset, not a no-op. Key bindings live on the tmux *server*, not on
+# the session, and a server outlives any one workspace — so a server that ever
+# ran an older workspace.sh still carries its MouseDown1Pane override, which
+# turned a bottom [ Logs ] pane into a button opening a popup via a script this
+# repo no longer ships. Simply dropping the bind-key here would leave that
+# stale binding in place for every existing user until they killed their
+# server. Binding the default back makes the outcome the same either way.
+#
+# The command list is one quoted argument. Written unquoted, the `;` would end
+# the bind-key command itself, binding only `select-pane` and running
+# `send-keys -M` as a stray command — which silently drops the click-through
+# half of the default, so a click would select a pane but never reach the
+# program inside it.
+tmux bind-key -T root MouseDown1Pane "select-pane -t = ; send-keys -M"
 
 # Disable mouse border dragging so pane sizes stay fixed
 tmux bind-key -T root MouseDrag1Border    ''
@@ -195,7 +199,6 @@ tmux bind-key -n C-q run-shell "$SCRIPT_DIR/scripts/quit_workspace.sh #{session_
 tmux send-keys -t "$LEFT" "$SCRIPT_DIR/scripts/agents/orchestrator.sh" Enter
 tmux send-keys -t "$TR" "$SCRIPT_DIR/scripts/agents/developer.sh" Enter
 tmux send-keys -t "$BR" "$SCRIPT_DIR/scripts/agents/tester.sh" Enter
-tmux send-keys -t "$LOGS_BTN" "$SCRIPT_DIR/scripts/logs_button.sh" Enter
 tmux send-keys -t "${SESSION_NAME}:runner" "$SCRIPT_DIR/scripts/agents/runner.sh" Enter
 
 # Start event watcher in background; it exits automatically when session ends.

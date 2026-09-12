@@ -46,7 +46,7 @@ make — not something you hand off.
    ```
    This executes the test command as a real process in the runner window
    instead of inside your own Bash-tool sandbox, so its output streams live
-   into the Watcher Log for the human to see as it happens. It blocks until
+   into the watcher log for the human to see as it happens. It blocks until
    the run finishes and exits with the test command's real exit code —
    `$?` after it tells you pass/fail, same as running the command directly
    would. Capture its output for the test-report below.

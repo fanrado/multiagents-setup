@@ -2,7 +2,8 @@
 # Submit a command to the shared runner terminal (scripts/agents/runner.sh)
 # instead of running it directly in the caller's own Bash tool. The command
 # executes as a real process in the runner's window and its output streams
-# live into the Watcher Log (watcher.log / the [Logs] popup) as it happens.
+# live into the watcher log as it happens
+# (${TMPDIR:-/tmp}/multiagents-<session>/watcher.log — `tail -f` it to watch).
 # Blocks until the command finishes, relays its output to our own stdout as
 # it arrives (so the calling agent sees it too), and exits with the same
 # exit code the command itself produced.
